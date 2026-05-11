@@ -1,0 +1,244 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: oklch(0.21 0.03 250);
+  --color-surface: oklch(0.26 0.03 250);
+  --color-surface-2: oklch(0.30 0.03 250);
+  --color-border: oklch(0.35 0.02 250);
+  --color-text: oklch(0.96 0.01 250);
+  --color-muted: oklch(0.72 0.02 250);
+  --color-driving: oklch(0.78 0.18 145);
+  --color-work: oklch(0.72 0.14 250);
+  --color-available: oklch(0.82 0.16 80);
+  --color-rest: oklch(0.55 0.02 250);
+  --color-warn: oklch(0.74 0.18 35);
+
+  --font-sans: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+}
+
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 400;
+  src: local(""), url("assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Printable weekly report — on-screen preview is white-on-light to match
+   what the print output will look like. */
+.print-page {
+  background: #fff;
+  color: #111;
+  min-height: 100vh;
+}
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: #f3f4f6;
+  border-bottom: 1px solid #d1d5db;
+  padding: 0.75rem 1rem;
+  color: #111;
+}
+.print-sheet {
+  background: #fff;
+  color: #111;
+  max-width: 1100px;
+  margin: 1.5rem auto;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #d1d5db;
+  font-size: 9pt;
+  line-height: 1.3;
+}
+.print-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+  border-bottom: 1.5px solid #111;
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.print-title-row {
+  font-size: 13pt;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.print-subtitle {
+  font-size: 10pt;
+  margin-top: 0.1rem;
+}
+.print-meta {
+  border-collapse: collapse;
+  font-size: 8.5pt;
+  width: 100%;
+}
+.print-meta th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.05rem 0.3rem 0.05rem 0;
+  color: #4b5563;
+  width: 64px;
+}
+.print-meta td {
+  padding: 0.05rem 0.5rem 0.05rem 0;
+}
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8pt;
+  margin: 0.25rem 0 0.5rem;
+}
+.print-table th,
+.print-table td {
+  border: 1px solid #9ca3af;
+  padding: 2px 4px;
+  text-align: left;
+  vertical-align: top;
+}
+.print-table thead th {
+  background: #e5e7eb;
+  font-weight: 600;
+}
+.print-table tbody tr.print-empty td {
+  color: #9ca3af;
+}
+.print-totals td {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+.print-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  margin: 0.25rem 0 0.5rem;
+}
+.print-row {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 8.5pt;
+}
+.print-label {
+  font-weight: 600;
+  min-width: 90px;
+}
+.print-infringements h2 {
+  font-size: 10pt;
+  font-weight: 700;
+  margin: 0.5rem 0 0.2rem;
+  padding-bottom: 0.1rem;
+  border-bottom: 1px solid #111;
+}
+.print-infringements ol {
+  padding-left: 1rem;
+  margin: 0;
+}
+.print-inf {
+  font-size: 8.5pt;
+  margin-bottom: 0.2rem;
+  line-height: 1.25;
+}
+.print-inf-sev {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7.5pt;
+  letter-spacing: 0.03em;
+}
+.print-inf-breach .print-inf-sev {
+  color: #b91c1c;
+  font-weight: 700;
+}
+.print-inf-warning .print-inf-sev {
+  color: #b45309;
+  font-weight: 700;
+}
+.print-inf-info .print-inf-sev {
+  color: #4b5563;
+}
+.print-inf-date {
+  color: #4b5563;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8pt;
+}
+.print-inf-desc {
+  margin-top: 0.05rem;
+}
+.print-inf-ref {
+  font-size: 7.5pt;
+  color: #4b5563;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.print-compliant {
+  color: #047857;
+  font-weight: 600;
+  margin: 0;
+}
+.print-footer {
+  margin-top: 0.6rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #9ca3af;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  font-size: 7.5pt;
+  color: #374151;
+}
+.print-sig {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.print-sig-line {
+  border-bottom: 1px solid #111;
+  padding-top: 0.8rem;
+  font-size: 7.5pt;
+  color: #4b5563;
+}
+.print-caveat {
+  line-height: 1.35;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 7mm 8mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .no-print,
+  .print-toolbar {
+    display: none !important;
+  }
+  .print-page {
+    background: #fff !important;
+  }
+  .print-sheet {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    max-width: none !important;
+  }
+  .print-table {
+    page-break-inside: avoid;
+  }
+  .print-infringements,
+  .print-footer {
+    page-break-inside: avoid;
+  }
+}
