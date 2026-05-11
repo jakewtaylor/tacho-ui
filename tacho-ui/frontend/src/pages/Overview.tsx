@@ -1,34 +1,42 @@
 import { useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import type { main } from '../../wailsjs/go/models';
+import { Navigate, useOutletContext, useParams } from 'react-router-dom';
 import {
   ActivityPanel,
   DriverSummaryPanel,
   EventsPanel,
   ShiftsPanel,
-  extractDriverSummary,
+  driverSummaryFromProfile,
 } from '../panels';
 import { MapPanel } from '../MapPanel';
-import { RawJSON } from '../RawJSON';
 import { pageTitle, useDocumentTitle } from '../useDocumentTitle';
+import { useDriverData } from '../useDriverData';
+import type { AppCtx } from '../App';
 
-export type AppCtx = {
-  result: main.ParseResult | null;
-  parsedData: any;
-  error: string | null;
-  loading: boolean;
-};
+export type { AppCtx } from '../App';
 
 export function Overview() {
-  const { result, parsedData, error, loading } = useOutletContext<AppCtx>();
+  const { cardNumber } = useParams<{ cardNumber: string }>();
+  const { importTick } = useOutletContext<AppCtx>();
+  const { data, loading, error } = useDriverData(cardNumber);
 
-  const summary = useMemo(() => {
-    if (!result || !parsedData) return [];
-    return extractDriverSummary(result.fileType, parsedData);
-  }, [result, parsedData]);
+  // Refetch when the import counter ticks (e.g. user dropped another file
+  // while looking at this driver).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useMemo(() => {}, [importTick]);
 
-  const driver = summary.find((s) => s.label === 'Driver')?.value;
-  useDocumentTitle(pageTitle(driver ?? result?.filename ?? null));
+  const summary = useMemo(
+    () => driverSummaryFromProfile(data?.profile ?? null),
+    [data?.profile]
+  );
+
+  const driverName = useMemo(() => {
+    const p = data?.profile;
+    if (!p) return null;
+    return [p.firstNames, p.surname].filter(Boolean).join(' ') || p.cardNumber;
+  }, [data?.profile]);
+  useDocumentTitle(pageTitle(driverName));
+
+  if (!cardNumber) return <Navigate to="/" replace />;
 
   if (error) {
     return (
@@ -38,41 +46,21 @@ export function Overview() {
     );
   }
 
-  if (!result || !parsedData) {
-    if (loading) {
-      return <div className="mt-16 text-center text-(--color-muted)">Parsing…</div>;
-    }
-    return (
-      <div className="mt-16 text-center text-(--color-muted)">
-        Open or drag in a{' '}
-        <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">.ddd</code> file to view its contents.
-      </div>
-    );
+  if (loading || !data) {
+    return <div className="mt-16 text-center text-(--color-muted)">Loading driver…</div>;
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <div className="break-all font-mono text-sm text-(--color-muted)">{result.filename}</div>
-        <span
-          className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider ${
-            result.fileType === 'card'
-              ? 'bg-sky-500/25 text-sky-200'
-              : 'bg-amber-500/25 text-amber-200'
-          }`}
-        >
-          {result.fileType}
-        </span>
-      </div>
-
       <DriverSummaryPanel summary={summary} />
-
-      {result.fileType === 'card' && <ActivityPanel data={parsedData} />}
-      {result.fileType === 'card' && <MapPanel data={parsedData} />}
-      {result.fileType === 'card' && <ShiftsPanel data={parsedData} />}
-      {result.fileType === 'card' && <EventsPanel data={parsedData} />}
-
-      <RawJSON json={result.json} />
+      <ActivityPanel cardNumber={cardNumber} records={data.dailyRecords} />
+      <MapPanel points={data.gnssPoints} />
+      <ShiftsPanel
+        cardNumber={cardNumber}
+        placeRecords={data.placeRecords}
+        vehicles={data.vehicles}
+      />
+      <EventsPanel events={data.events} />
     </div>
   );
 }

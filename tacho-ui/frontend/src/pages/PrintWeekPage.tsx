@@ -1,18 +1,15 @@
 import { useMemo, useState } from 'react';
-import { useDocumentTitle } from '../useDocumentTitle';
-import { Link, Navigate, useOutletContext, useParams } from 'react-router-dom';
-import { PrintWindow } from '../../wailsjs/go/main/App';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import {
   computeDailyStats,
   computeDayDetail,
-  extractDailyRecords,
   formatHours,
   type DailyRecord,
   type DailyStats,
 } from '../activity';
-import { deriveShifts, extractPlaceRecords, formatTimeOfDay, type Shift } from '../shifts';
-import { extractVehicles, vehicleForShift, type VehicleUsage } from '../vehicles';
-import { extractDriverSummary } from '../panels';
+import { deriveShifts, formatTimeOfDay, type Shift } from '../shifts';
+import { vehicleForShift, type VehicleUsage } from '../vehicles';
+import { driverSummaryFromProfile } from '../panels';
 import { dowLabel, formatWeekRange, groupByWeekSunday } from '../weeks';
 import {
   assessWeeklyRest,
@@ -23,7 +20,9 @@ import {
   type WeekRestAssessment,
 } from '../weeklyRest';
 import { detectWeekInfringements, type Infringement } from '../infringements';
-import type { AppCtx } from './Overview';
+import { useDriverData } from '../useDriverData';
+import { useDocumentTitle } from '../useDocumentTitle';
+import { PrintWindow } from '../../wailsjs/go/main/App';
 
 const COLUMNS = [
   { key: 'date', label: 'Date' },
@@ -40,42 +39,75 @@ const COLUMNS = [
 ];
 
 export function PrintWeekPage() {
-  const { weekStart: weekStartParam } = useParams<{ weekStart: string }>();
-  const { result, parsedData } = useOutletContext<AppCtx>();
+  const { cardNumber, weekStart } = useParams<{ cardNumber: string; weekStart: string }>();
+  const { data, loading, error } = useDriverData(cardNumber);
 
   const computed = useMemo(() => {
-    if (!parsedData) return null;
-    const records: DailyRecord[] = extractDailyRecords(parsedData);
-    const stats = records.map(computeDailyStats);
+    if (!data) return null;
+    const stats = data.dailyRecords.map(computeDailyStats);
     const weeks = groupByWeekSunday(stats);
-    const shifts = deriveShifts(extractPlaceRecords(parsedData));
+    const shifts = deriveShifts(data.placeRecords);
     const shiftsByDate = new Map<string, Shift>();
     for (const s of shifts) {
       if (!shiftsByDate.has(s.date)) shiftsByDate.set(s.date, s);
     }
-    const vehicles = extractVehicles(parsedData);
     const recordsByDate = new Map<string, DailyRecord>();
-    for (const r of records) recordsByDate.set(r.activity_record_date.slice(0, 10), r);
-    const restSpans = extractRestSpans(records);
-    const possibleRest = extractPossibleRestSpans(records);
-    const ambiguous = extractAmbiguousSpans(records);
-    const win = dataWindow(records);
-    return { records, weeks, shiftsByDate, vehicles, recordsByDate, restSpans, possibleRest, ambiguous, win };
-  }, [parsedData]);
+    for (const r of data.dailyRecords) {
+      recordsByDate.set(r.activity_record_date.slice(0, 10), r);
+    }
+    const restSpans = extractRestSpans(data.dailyRecords);
+    const possibleRest = extractPossibleRestSpans(data.dailyRecords);
+    const ambiguous = extractAmbiguousSpans(data.dailyRecords);
+    const win = dataWindow(data.dailyRecords);
+    return {
+      weeks,
+      shiftsByDate,
+      recordsByDate,
+      restSpans,
+      possibleRest,
+      ambiguous,
+      win,
+      vehicles: data.vehicles,
+    };
+  }, [data]);
 
-  if (!result || !parsedData) return <Navigate to="/" replace />;
-  if (!weekStartParam) return <Navigate to="/weeks" replace />;
-  if (!computed) return <Navigate to="/weeks" replace />;
+  const driverSummary = useMemo(
+    () => driverSummaryFromProfile(data?.profile ?? null),
+    [data?.profile]
+  );
+  const driver = driverSummary.find((s) => s.label === 'Driver')?.value ?? '—';
+  const cardNumberDisplay =
+    driverSummary.find((s) => s.label === 'Card number')?.value ?? cardNumber ?? '—';
 
-  const weekIdx = computed.weeks.findIndex((w) => w.weekStart === weekStartParam);
+  const driverPart = driver && driver !== '—' ? sanitiseForFilename(driver) : 'driver';
+  useDocumentTitle(
+    weekStart
+      ? `Tachograph weekly - ${driverPart} - ${weekStart} to ${addDays(weekStart, 6)}`
+      : null
+  );
+
+  if (!cardNumber || !weekStart) return <Navigate to="/" replace />;
+
+  if (error) {
+    return (
+      <div className="p-8 text-sm">
+        <p className="text-red-700">{error}</p>
+      </div>
+    );
+  }
+  if (loading || !data || !computed) {
+    return <div className="p-8 text-sm text-(--color-muted)">Loading…</div>;
+  }
+
+  const weekIdx = computed.weeks.findIndex((w) => w.weekStart === weekStart);
   if (weekIdx === -1) {
     return (
       <div className="p-8">
         <p>
           No data for week starting{' '}
-          <code className="rounded bg-gray-200 px-1.5 py-0.5">{weekStartParam}</code>.
+          <code className="rounded bg-gray-200 px-1.5 py-0.5">{weekStart}</code>.
         </p>
-        <Link to="/weeks" className="text-blue-600 underline">
+        <Link to={`/driver/${cardNumber}/weeks`} className="text-blue-600 underline">
           Back to weeks
         </Link>
       </div>
@@ -83,7 +115,7 @@ export function PrintWeekPage() {
   }
 
   const week = computed.weeks[weekIdx];
-  const prevWeek = computed.weeks[weekIdx + 1] ?? null; // newer-first ordering
+  const prevWeek = computed.weeks[weekIdx + 1] ?? null;
   const weeklyRest: WeekRestAssessment = assessWeeklyRest(
     week,
     computed.restSpans,
@@ -98,15 +130,6 @@ export function PrintWeekPage() {
     shiftsByDate: computed.shiftsByDate,
     weeklyRest,
   });
-
-  const driverSummary = extractDriverSummary(result.fileType, parsedData);
-  const driver = driverSummary.find((s) => s.label === 'Driver')?.value ?? '—';
-  const cardNumber = driverSummary.find((s) => s.label === 'Card number')?.value ?? '—';
-
-  // Sets document.title — which doubles as the macOS print dialog's default
-  // "Save as PDF" filename suggestion.
-  const driverPart = driver && driver !== '—' ? sanitiseForFilename(driver) : 'driver';
-  useDocumentTitle(`Tachograph weekly - ${driverPart} - ${week.weekStart} to ${week.weekEnd}`);
 
   const totals = week.days.reduce(
     (acc, d) => {
@@ -133,8 +156,7 @@ export function PrintWeekPage() {
 
   return (
     <div className="print-page">
-      <PrintToolbar />
-
+      <PrintToolbar cardNumber={cardNumber} />
 
       <article className="print-sheet">
         <header className="print-header">
@@ -148,7 +170,7 @@ export function PrintWeekPage() {
                 <th>Driver</th>
                 <td>{driver}</td>
                 <th>Card #</th>
-                <td>{cardNumber}</td>
+                <td>{cardNumberDisplay}</td>
               </tr>
               <tr>
                 <th>Period</th>
@@ -156,7 +178,7 @@ export function PrintWeekPage() {
                   {week.weekStart} → {week.weekEnd}
                 </td>
                 <th>Source</th>
-                <td className="font-mono">{result.filename}</td>
+                <td>{data.profile.importCount} import{data.profile.importCount === 1 ? '' : 's'}</td>
               </tr>
             </tbody>
           </table>
@@ -251,8 +273,8 @@ export function PrintWeekPage() {
           </div>
           <div className="print-caveat">
             Generated by tacho-ui · Weekly rest detected only across card-inserted periods · Sun–Sat
-            week buckets used for display (EU regulatory week is Mon–Sun) · Compensation tracking for
-            reduced weekly rests not modelled.
+            week buckets used for display (EU regulatory week is Mon–Sun) · Compensation tracking
+            for reduced weekly rests not modelled.
           </div>
         </footer>
       </article>
@@ -309,8 +331,6 @@ function addDays(yyyyMmDd: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Strip characters macOS / Windows / Linux dislike in filenames. We keep
-// spaces and dashes (macOS handles them fine) and collapse whitespace.
 function sanitiseForFilename(s: string): string {
   return s
     .replace(/[\\/:*?"<>|]+/g, '')
@@ -318,13 +338,7 @@ function sanitiseForFilename(s: string): string {
     .trim();
 }
 
-/**
- * In-app print toolbar. Wails v2's WKWebView shim doesn't implement
- * `window.print()`, so the button serialises the rendered print-sheet plus
- * the page's stylesheets into a self-contained data: URL and asks Wails to
- * open it in the user's default browser, where ⌘P / Ctrl-P actually works.
- */
-function PrintToolbar() {
+function PrintToolbar({ cardNumber }: { cardNumber: string }) {
   const [error, setError] = useState<string | null>(null);
 
   async function printInApp() {
@@ -339,7 +353,7 @@ function PrintToolbar() {
   return (
     <div className="print-toolbar no-print">
       <div className="flex items-center gap-3">
-        <Link to="/weeks" className="rounded border border-gray-300 px-3 py-1.5 text-sm">
+        <Link to={`/driver/${cardNumber}/weeks`} className="rounded border border-gray-300 px-3 py-1.5 text-sm">
           ← Back to weeks
         </Link>
         <span className="text-sm text-gray-600">Print preview</span>

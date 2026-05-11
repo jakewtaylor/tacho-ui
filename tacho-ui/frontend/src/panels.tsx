@@ -2,75 +2,50 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   computeDailyStats,
-  extractDailyRecords,
   formatHours,
   rollup,
+  type DailyRecord,
   type DailyStats,
 } from './activity';
 import { DailyActivityChart } from './DailyActivityChart';
 import {
   deriveShifts,
-  extractPlaceRecords,
   formatTimeOfDay,
+  type PlaceRecord,
   type Shift,
 } from './shifts';
 import { nationAlpha, nationName } from './nations';
-import { extractVehicles, vehicleForShift } from './vehicles';
-import { extractEventsAndFaults, durationMinutes, type CardEvent } from './events';
+import { vehicleForShift, type VehicleUsage } from './vehicles';
+import { durationMinutes, type CardEvent } from './events';
 import { eventCategory, eventTypeLabel } from './eventTypes';
+import type { db } from '../wailsjs/go/models';
 
 export type Summary = {
   label: string;
   value: string;
 };
 
-export function extractDriverSummary(fileType: string, data: any): Summary[] {
-  if (!data) return [];
-
-  if (fileType === 'card') {
-    const ident =
-      data.card_identification_and_driver_card_holder_identification_1 ??
-      data.card_identification_and_driver_card_holder_identification_2;
-    if (!ident) return [];
-
-    const name = ident.driver_card_holder_identification?.card_holder_name;
-    const id = ident.card_identification;
-    const dob = ident.driver_card_holder_identification?.card_holder_birth_date;
-
-    const out: Summary[] = [];
-    if (name?.holder_surname || name?.holder_first_names) {
-      out.push({
-        label: 'Driver',
-        value: [name.holder_first_names, name.holder_surname]
-          .filter(Boolean)
-          .join(' '),
-      });
-    }
-    if (id?.card_number) out.push({ label: 'Card number', value: id.card_number });
-    if (id?.card_issuing_member_state !== undefined) {
-      out.push({
-        label: 'Issuing member state',
-        value: nationName(id.card_issuing_member_state),
-      });
-    }
-    if (id?.card_issue_date) out.push({ label: 'Issued', value: String(id.card_issue_date) });
-    if (id?.card_expiry_date) out.push({ label: 'Expires', value: String(id.card_expiry_date) });
-    if (dob) {
-      out.push({
-        label: 'Date of birth',
-        value: `${dob.year}-${String(dob.month).padStart(2, '0')}-${String(dob.day).padStart(2, '0')}`,
-      });
-    }
-    return out;
+/** Build the Driver summary key/value list from a DriverProfile DB row. */
+export function driverSummaryFromProfile(profile: db.DriverProfile | null): Summary[] {
+  if (!profile) return [];
+  const out: Summary[] = [];
+  const name = [profile.firstNames, profile.surname].filter(Boolean).join(' ');
+  if (name) out.push({ label: 'Driver', value: name });
+  out.push({ label: 'Card number', value: profile.cardNumber });
+  if (profile.issuingState) {
+    out.push({ label: 'Issuing member state', value: nationName(profile.issuingState) });
   }
-
-  if (fileType === 'vu') {
-    const ident = data.vu_identification ?? data.vehicle_identification;
-    if (ident?.vehicle_identification_number) {
-      return [{ label: 'VIN', value: ident.vehicle_identification_number }];
-    }
+  if (profile.cardIssueDate) out.push({ label: 'Issued', value: profile.cardIssueDate });
+  if (profile.cardExpiryDate) out.push({ label: 'Expires', value: profile.cardExpiryDate });
+  if (profile.birthDate) out.push({ label: 'Date of birth', value: profile.birthDate });
+  if (profile.firstDate && profile.lastDate) {
+    out.push({ label: 'Data range', value: `${profile.firstDate} → ${profile.lastDate}` });
   }
-  return [];
+  out.push({
+    label: 'Imports',
+    value: `${profile.importCount} (${profile.dailyRecordCount} days)`,
+  });
+  return out;
 }
 
 export function DriverSummaryPanel({ summary }: { summary: Summary[] }) {
@@ -137,8 +112,13 @@ function Legend() {
   );
 }
 
-export function ActivityPanel({ data }: { data: any }) {
-  const records = useMemo(() => extractDailyRecords(data), [data]);
+export function ActivityPanel({
+  cardNumber,
+  records,
+}: {
+  cardNumber: string;
+  records: DailyRecord[];
+}) {
   const allDays = useMemo(() => records.map(computeDailyStats), [records]);
 
   if (allDays.length === 0) {
@@ -212,7 +192,7 @@ export function ActivityPanel({ data }: { data: any }) {
         {last28.map((day) => (
           <Link
             key={day.date}
-            to={`/day/${day.date}`}
+            to={`/driver/${cardNumber}/day/${day.date}`}
             className="grid w-full items-center gap-x-3 border-t border-(--color-border) px-4 py-2 text-sm tabular-nums first:border-t-0 cursor-pointer hover:bg-white/5"
             style={{ gridTemplateColumns: '110px minmax(140px,1fr) 90px 80px 80px 70px' }}
           >
@@ -242,13 +222,19 @@ export function ActivityPanel({ data }: { data: any }) {
   );
 }
 
-export function ShiftsPanel({ data }: { data: any }) {
-  const shifts = useMemo<Shift[]>(() => {
-    const records = extractPlaceRecords(data);
-    return deriveShifts(records).slice(0, 20);
-  }, [data]);
-
-  const vehicles = useMemo(() => extractVehicles(data), [data]);
+export function ShiftsPanel({
+  cardNumber,
+  placeRecords,
+  vehicles,
+}: {
+  cardNumber: string;
+  placeRecords: PlaceRecord[];
+  vehicles: VehicleUsage[];
+}) {
+  const shifts = useMemo<Shift[]>(
+    () => deriveShifts(placeRecords).slice(0, 20),
+    [placeRecords]
+  );
 
   if (shifts.length === 0) return null;
 
@@ -274,7 +260,7 @@ export function ShiftsPanel({ data }: { data: any }) {
           return (
             <Link
               key={i}
-              to={`/day/${s.date}`}
+              to={`/driver/${cardNumber}/day/${s.date}`}
               className="grid items-center gap-x-3 border-t border-(--color-border) px-4 py-2 text-sm tabular-nums first:border-t-0 hover:bg-white/5"
               style={{ gridTemplateColumns: '110px 100px 1fr 1fr 90px 80px' }}
             >
@@ -343,8 +329,8 @@ function categoryColor(c: ReturnType<typeof eventCategory>): string {
   }
 }
 
-export function EventsPanel({ data }: { data: any }) {
-  const rows = useMemo<CardEvent[]>(() => extractEventsAndFaults(data).slice(0, 30), [data]);
+export function EventsPanel({ events }: { events: CardEvent[] }) {
+  const rows = useMemo<CardEvent[]>(() => events.slice(0, 30), [events]);
   if (rows.length === 0) return null;
 
   return (

@@ -5,7 +5,7 @@ import {
   AdvancedMarker,
   useMap,
 } from '@vis.gl/react-google-maps';
-import { extractGnssPoints, type GnssPoint } from './gnss';
+import { type GnssPoint } from './gnss';
 
 const HEIGHT = 420;
 
@@ -13,16 +13,15 @@ const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID ?? 'TACHO_VIEWER_DARK';
 
 type Props = {
-  data: any;
+  points: GnssPoint[];
   /** yyyy-mm-dd — only show GNSS samples whose timestamp falls on this UTC date. */
   dateFilter?: string;
   /** Optional override for the section heading. */
   title?: string;
 };
 
-export function MapPanel({ data, dateFilter, title }: Props) {
-  const allPoints = useMemo<GnssPoint[]>(() => extractGnssPoints(data), [data]);
-  const points = useMemo(() => {
+export function MapPanel({ points: allPoints, dateFilter, title }: Props) {
+  const points = useMemo<GnssPoint[]>(() => {
     if (!dateFilter) return allPoints;
     return allPoints.filter((p) => p.timestamp.startsWith(dateFilter));
   }, [allPoints, dateFilter]);

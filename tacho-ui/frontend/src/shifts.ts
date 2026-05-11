@@ -37,14 +37,6 @@ export const DAILY_REST_MIN = 11 * 60;
 const BEGIN_TYPES = new Set([0, 2]);
 const END_TYPES = new Set([1, 3]);
 
-export function extractPlaceRecords(data: any): PlaceRecord[] {
-  const g1 = data?.card_place_daily_work_period_1?.place_records;
-  if (Array.isArray(g1) && g1.length > 0) return g1 as PlaceRecord[];
-  const g2 = data?.card_place_daily_work_period_2?.place_records;
-  if (Array.isArray(g2)) return g2 as PlaceRecord[];
-  return [];
-}
-
 export function deriveShifts(records: PlaceRecord[]): Shift[] {
   // Sort ascending by entry_time, but ignore zero / placeholder entries.
   const sorted = records

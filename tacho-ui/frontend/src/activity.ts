@@ -3,13 +3,16 @@
 //   1 = availability
 //   2 = work (not driving)
 //   3 = driving
-export type WorkType = 0 | 1 | 2 | 3;
+// Encoded as plain `number` on the wire — we don't narrow to a union here
+// because the Wails-generated binding types use `number`, and a narrower
+// alias would require casts at every binding boundary.
+export type WorkType = number;
 
 export type ActivityChange = {
   driver: boolean;
   team: boolean;
   card_present: boolean;
-  work_type: WorkType;
+  work_type: number;
   minutes: number; // minutes since midnight
 };
 
@@ -124,14 +127,6 @@ export function formatHours(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-export function extractDailyRecords(data: any): DailyRecord[] {
-  // Prefer Gen1 record (longer history on this sample), fall back to Gen2.
-  const g1 = data?.card_driver_activity_1?.decoded_activity_daily_records;
-  if (Array.isArray(g1) && g1.length > 0) return g1 as DailyRecord[];
-  const g2 = data?.card_driver_activity_2?.decoded_activity_daily_records;
-  if (Array.isArray(g2)) return g2 as DailyRecord[];
-  return [];
-}
 
 export function formatClock(minutes: number): string {
   const m = Math.max(0, Math.min(MINUTES_IN_DAY, Math.round(minutes)));

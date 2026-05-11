@@ -1,82 +1,104 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"tacho-ui/internal/db"
+	"tacho-ui/internal/importer"
 )
 
-// TestParseSampleCard verifies the in-process parser produces the same key
-// driver-identification fields as the dddparser CLI does. Run from tacho-ui/.
-func TestParseSampleCard(t *testing.T) {
-	const sample = "../C_20260509_1146_M_TAYLOR_DB141641620128.ddd"
-	if _, err := os.Stat(sample); err != nil {
+const samplePath = "../C_20260509_1146_M_TAYLOR_DB141641620128.ddd"
+
+// TestImportSampleCard imports the sample driver-card into a temp DB and
+// asserts that the resulting rows match what the dddparser CLI produced.
+func TestImportSampleCard(t *testing.T) {
+	if _, err := os.Stat(samplePath); err != nil {
 		t.Skipf("sample .ddd not present: %v", err)
 	}
-
-	data, err := os.ReadFile(sample)
+	data, err := os.ReadFile(samplePath)
 	if err != nil {
 		t.Fatalf("read sample: %v", err)
 	}
 
-	got, err := parseBytes("C_sample.ddd", data, true)
+	ctx := context.Background()
+	tmp := filepath.Join(t.TempDir(), "tacho-test.db")
+	store, err := db.OpenAt(ctx, tmp)
 	if err != nil {
-		t.Fatalf("parseBytes: %v", err)
+		t.Fatalf("open db: %v", err)
 	}
-	if got.FileType != "card" {
-		t.Fatalf("FileType = %q, want %q", got.FileType, "card")
+	defer store.Close()
+
+	result, err := importer.ImportCard(ctx, store, filepath.Base(samplePath), data)
+	if err != nil {
+		t.Fatalf("ImportCard: %v", err)
 	}
-	if len(got.JSON) < 1_000_000 {
-		t.Fatalf("JSON too short (%d bytes); parse likely incomplete", len(got.JSON))
+	if result.AlreadyImported {
+		t.Fatalf("first import unexpectedly flagged AlreadyImported")
+	}
+	if !strings.HasPrefix(result.DriverCardNumber, "DB14164162012802") {
+		t.Fatalf("DriverCardNumber = %q, want prefix DB14164162012802", result.DriverCardNumber)
+	}
+	if result.Counts["daily_records"] < 100 {
+		t.Fatalf("daily_records too low: %d", result.Counts["daily_records"])
+	}
+	if result.Counts["place_records"] == 0 {
+		t.Fatalf("place_records was zero — shift derivation will break")
 	}
 
-	var parsed map[string]any
-	if err := json.Unmarshal([]byte(got.JSON), &parsed); err != nil {
-		t.Fatalf("unmarshal output: %v", err)
+	// Driver profile.
+	profile, err := store.GetDriverProfile(ctx, result.DriverCardNumber)
+	if err != nil {
+		t.Fatalf("GetDriverProfile: %v", err)
+	}
+	if profile == nil {
+		t.Fatalf("driver profile missing for %s", result.DriverCardNumber)
+	}
+	if !strings.Contains(profile.Surname, "TAYLOR") || !strings.Contains(profile.FirstNames, "MARK") {
+		t.Fatalf("unexpected holder name: %q / %q", profile.FirstNames, profile.Surname)
+	}
+	if profile.DailyRecordCount < 100 {
+		t.Fatalf("DailyRecordCount = %d, want >= 100", profile.DailyRecordCount)
 	}
 
-	ident, ok := parsed["card_identification_and_driver_card_holder_identification_1"].(map[string]any)
-	if !ok {
-		t.Fatalf("missing card_identification_and_driver_card_holder_identification_1")
+	// Daily records — guard the activity_change_info round-trip through JSON.
+	days, err := store.GetDailyRecords(ctx, result.DriverCardNumber)
+	if err != nil {
+		t.Fatalf("GetDailyRecords: %v", err)
 	}
-	holder := ident["driver_card_holder_identification"].(map[string]any)
-	name := holder["card_holder_name"].(map[string]any)
-
-	surname, _ := name["holder_surname"].(string)
-	first, _ := name["holder_first_names"].(string)
-	if !strings.Contains(surname, "TAYLOR") || !strings.Contains(first, "MARK") {
-		t.Fatalf("unexpected holder name: %q / %q", first, surname)
+	if len(days) == 0 {
+		t.Fatalf("GetDailyRecords returned no rows")
 	}
-
-	card := ident["card_identification"].(map[string]any)
-	cardNum, _ := card["card_number"].(string)
-	if !strings.HasPrefix(cardNum, "DB14164162012802") {
-		t.Fatalf("unexpected card_number: %q", cardNum)
+	first := days[0]
+	if len(first.ActivityChangeInfo) == 0 {
+		t.Fatalf("first day has no activity_change_info events")
 	}
 
-	// Activity records are what the UI overview is built on — guard the shape.
-	activity, ok := parsed["card_driver_activity_1"].(map[string]any)
-	if !ok {
-		t.Fatalf("missing card_driver_activity_1")
+	// Re-import the same bytes → AlreadyImported with the prior import ID.
+	again, err := importer.ImportCard(ctx, store, filepath.Base(samplePath), data)
+	if err != nil {
+		t.Fatalf("re-import: %v", err)
 	}
-	records, ok := activity["decoded_activity_daily_records"].([]any)
-	if !ok || len(records) == 0 {
-		t.Fatalf("decoded_activity_daily_records missing or empty")
+	if !again.AlreadyImported {
+		t.Fatalf("re-import should be flagged AlreadyImported")
 	}
-	firstDay := records[0].(map[string]any)
-	if _, ok := firstDay["activity_record_date"].(string); !ok {
-		t.Fatalf("daily record missing activity_record_date")
+	if again.ImportID != result.ImportID {
+		t.Fatalf("re-import ID changed: %d → %d", result.ImportID, again.ImportID)
 	}
-	events, ok := firstDay["activity_change_info"].([]any)
-	if !ok || len(events) == 0 {
-		t.Fatalf("daily record missing activity_change_info events")
+
+	// Driver list aggregate counts should match the single driver.
+	drivers, err := store.ListDrivers(ctx)
+	if err != nil {
+		t.Fatalf("ListDrivers: %v", err)
 	}
-	ev := events[0].(map[string]any)
-	for _, key := range []string{"work_type", "minutes", "card_present"} {
-		if _, present := ev[key]; !present {
-			t.Fatalf("activity_change_info[0] missing %q", key)
-		}
+	if len(drivers) != 1 {
+		t.Fatalf("ListDrivers = %d drivers, want 1", len(drivers))
+	}
+	if drivers[0].ImportCount != 1 {
+		t.Fatalf("ImportCount = %d, want 1", drivers[0].ImportCount)
 	}
 }
 
@@ -90,8 +112,8 @@ func TestLooksLikeCard(t *testing.T) {
 		"C_TAYLOR_X.ddd": true,
 	}
 	for name, want := range cases {
-		if got := looksLikeCard(name); got != want {
-			t.Errorf("looksLikeCard(%q) = %v, want %v", name, got, want)
+		if got := importer.LooksLikeCard(name); got != want {
+			t.Errorf("importer.LooksLikeCard(%q) = %v, want %v", name, got, want)
 		}
 	}
 }

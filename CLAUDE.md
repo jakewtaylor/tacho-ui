@@ -64,7 +64,29 @@ cd tacho-ui && go test -v
 
 ## tacho-ui current state
 
-Working POC: file picker → parse → driver summary + **activity overview** (7d/28d rollups, visx stacked-bar chart of last 28 days driving/work/available with 9h-limit reference line, daily list with mini activity bars, EU 9h-over-limit flags) + **clickable day → detail view** (24h timeline strip, driving sessions with 4h30m continuous-driving break-compliance check, full segment list) + collapsible raw JSON. React 18 + Vite 8 + TypeScript 4.6 frontend, Wails v2 Go backend. Styled with **Tailwind v4** (via `@tailwindcss/vite`); custom design tokens live in `frontend/src/style.css` under `@theme`. Charts use **@visx** (scale, shape/BarStack, axis, group, grid, responsive).
+Persistent desktop app: SQLite-backed store + import flow + driver-scoped pages. Imports a `.ddd` file via dialog or drag-and-drop, dedups by SHA256, splits into normalised rows (drivers, vehicles, imports, daily_records, place_records, gnss_points, events_faults), and serves every view from the DB. React 18 + Vite 8 + TypeScript frontend, Wails v2 Go backend.
+
+### Backend layout
+
+- **`internal/db/`** — SQLite store via `modernc.org/sqlite` (pure-Go, no CGO). DB lives at `os.UserConfigDir()/tacho-ui/tacho.db` (on macOS: `~/Library/Application Support/tacho-ui/tacho.db`). Schema is in `internal/db/migrations/0001_init.sql`, applied via a numbered-migration runner that tracks state in `schema_migrations`. Read APIs return shapes that match the *post-extract* frontend types (so binding results are consumable directly — no `extract*` step).
+- **`internal/importer/`** — parses the file via tachoparser, marshals to JSON for storage (gzipped in `imports.raw_json` for safekeeping / future re-render), then unmarshals into a payload struct mirroring just the JSON paths we care about. Inserts in a single transaction with `INSERT OR REPLACE` for daily/place/gnss/events (last-write-wins on (driver, date) collisions across re-imports) and `INSERT OR IGNORE`-then-`UPDATE` for `drivers`/`vehicles`. Same SHA256 → `AlreadyImported=true`, prior import ID + driver returned.
+
+### Bound methods (`tacho-ui/app.go`)
+
+- `ImportDDDDialog()` — open dialog, import. `nil` result + `nil` err = user cancelled.
+- `ImportDDDFromPath(path)` — import a specific path. Used by drag-drop.
+- `ListImports(cardNumber)`, `DeleteImport(importID)` — manage imported files.
+- `ListDrivers()` — landing-page list.
+- `GetDriverProfile(cardNumber)` — full identity + aggregates.
+- `GetDailyRecords(cardNumber)`, `GetPlaceRecords(cardNumber)`, `GetGnssPoints(cardNumber)`, `GetEventsAndFaults(cardNumber)`, `GetDriverVehicles(cardNumber)` — typed row fetches.
+- `PrintWindow()` — native print dialog (via Wails PR #2822's `runtime.WindowPrint`).
+
+### Frontend layout
+
+- **`useDriverData(cardNumber)`** hook fetches all of `{profile, dailyRecords, placeRecords, gnssPoints, events, vehicles}` in parallel via the bindings. Pages call this; existing compute libraries (`activity.ts`, `infringements.ts`, `weeklyRest.ts`, `shifts.ts`, `weeks.ts`) consume those rows as-is — the JSON-tree-walking `extract*` helpers are deleted.
+- **Pages:** `Home` (`/`) lists drivers. `Overview` (`/driver/:cardNumber`), `WeeksPage` (`/driver/:cardNumber/weeks`), `DayPage` (`/driver/:cardNumber/day/:date`), `PrintWeekPage` (`/driver/:cardNumber/print/week/:weekStart`) all scoped by card number from the URL.
+
+Styled with **Tailwind v4** (via `@tailwindcss/vite`); custom design tokens live in `frontend/src/style.css` under `@theme`. Charts use **@visx** (scale, shape/BarStack, axis, group, grid, responsive).
 
 ### Break-compliance logic (`activity.ts` → `computeDayDetail`)
 

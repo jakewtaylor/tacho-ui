@@ -1,13 +1,12 @@
 import { useMemo } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import {
   computeDailyStats,
-  extractDailyRecords,
   formatHours,
   type DailyRecord,
   type DailyStats,
 } from '../activity';
-import { deriveShifts, extractPlaceRecords, type Shift } from '../shifts';
+import { deriveShifts, type Shift } from '../shifts';
 import {
   countInfringements,
   detectWeekInfringements,
@@ -24,18 +23,18 @@ import {
   type WeekRestAssessment,
 } from '../weeklyRest';
 import { pageTitle, useDocumentTitle } from '../useDocumentTitle';
-import { extractDriverSummary } from '../panels';
-import type { AppCtx } from './Overview';
+import { useDriverData } from '../useDriverData';
 
 export function WeeksPage() {
-  const { result, parsedData, error, loading } = useOutletContext<AppCtx>();
+  const { cardNumber } = useParams<{ cardNumber: string }>();
+  const { data, loading, error } = useDriverData(cardNumber);
 
-  const driver = useMemo(() => {
-    if (!result || !parsedData) return null;
-    return extractDriverSummary(result.fileType, parsedData).find((s) => s.label === 'Driver')
-      ?.value ?? null;
-  }, [result, parsedData]);
-  useDocumentTitle(pageTitle(driver ? `Weekly summary — ${driver}` : 'Weekly summary'));
+  const driverName = useMemo(() => {
+    const p = data?.profile;
+    if (!p) return null;
+    return [p.firstNames, p.surname].filter(Boolean).join(' ') || p.cardNumber;
+  }, [data?.profile]);
+  useDocumentTitle(pageTitle(driverName ? `Weekly summary — ${driverName}` : 'Weekly summary'));
 
   const { weeks, recordsByDate, shiftsByDate, weeklyRestByWeek } = useMemo(() => {
     const empty = {
@@ -44,22 +43,22 @@ export function WeeksPage() {
       shiftsByDate: new Map<string, Shift>(),
       weeklyRestByWeek: new Map<string, WeekRestAssessment>(),
     };
-    if (!parsedData) return empty;
-    const records = extractDailyRecords(parsedData);
-    const days = records.map(computeDailyStats);
+    if (!data) return empty;
+    const days = data.dailyRecords.map(computeDailyStats);
     const recMap = new Map<string, DailyRecord>();
-    for (const r of records) recMap.set(r.activity_record_date.slice(0, 10), r);
-    const shifts = deriveShifts(extractPlaceRecords(parsedData));
+    for (const r of data.dailyRecords) {
+      recMap.set(r.activity_record_date.slice(0, 10), r);
+    }
+    const shifts = deriveShifts(data.placeRecords);
     const shiftMap = new Map<string, Shift>();
     for (const s of shifts) {
-      // Newest-first list; keep the first per date so a same-day duplicate doesn't overwrite.
       if (!shiftMap.has(s.date)) shiftMap.set(s.date, s);
     }
     const groupedWeeks = groupByWeekSunday(days);
-    const restSpans = extractRestSpans(records);
-    const possible = extractPossibleRestSpans(records);
-    const ambiguous = extractAmbiguousSpans(records);
-    const win = dataWindow(records);
+    const restSpans = extractRestSpans(data.dailyRecords);
+    const possible = extractPossibleRestSpans(data.dailyRecords);
+    const ambiguous = extractAmbiguousSpans(data.dailyRecords);
+    const win = dataWindow(data.dailyRecords);
     const restMap = new Map<string, WeekRestAssessment>();
     for (const w of groupedWeeks) {
       restMap.set(w.weekStart, assessWeeklyRest(w, restSpans, possible, ambiguous, win));
@@ -70,15 +69,13 @@ export function WeeksPage() {
       shiftsByDate: shiftMap,
       weeklyRestByWeek: restMap,
     };
-  }, [parsedData]);
+  }, [data]);
 
-  // Build per-week infringements and a flat list for the headline.
   const { weekInfringements, allItems } = useMemo(() => {
     const map = new Map<string, Infringement[]>();
     const all: Infringement[] = [];
     for (let i = 0; i < weeks.length; i++) {
       const w = weeks[i];
-      // weeks are newest-first; the "previous" week chronologically is weeks[i + 1].
       const prev = weeks[i + 1] ?? null;
       const items = detectWeekInfringements({
         week: w,
@@ -95,6 +92,8 @@ export function WeeksPage() {
 
   const totalCounts = countInfringements(allItems);
 
+  if (!cardNumber) return <Navigate to="/" replace />;
+
   if (error) {
     return (
       <div className="rounded-md border border-(--color-warn)/60 bg-(--color-warn)/10 px-3 py-2 font-mono text-xs">
@@ -102,27 +101,9 @@ export function WeeksPage() {
       </div>
     );
   }
-
-  if (!result || !parsedData) {
-    if (loading) {
-      return <div className="mt-16 text-center text-(--color-muted)">Parsing…</div>;
-    }
-    return (
-      <div className="mt-16 text-center text-(--color-muted)">
-        Open or drag in a{' '}
-        <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">.ddd</code> file to view its contents.
-      </div>
-    );
+  if (loading || !data) {
+    return <div className="mt-16 text-center text-(--color-muted)">Loading…</div>;
   }
-
-  if (result.fileType !== 'card') {
-    return (
-      <div className="mt-16 text-center text-(--color-muted)">
-        Weekly view is only available for driver-card files.
-      </div>
-    );
-  }
-
   if (weeks.length === 0) {
     return (
       <div className="rounded-lg border border-(--color-border) bg-(--color-surface) p-6 text-center text-(--color-muted)">
@@ -134,7 +115,7 @@ export function WeeksPage() {
   return (
     <div className="flex flex-col gap-5">
       <Link
-        to="/"
+        to={`/driver/${cardNumber}`}
         className="self-start text-xs text-(--color-muted) hover:text-white"
       >
         ← Overview
@@ -153,6 +134,7 @@ export function WeeksPage() {
         {weeks.map((w) => (
           <WeekCard
             key={w.weekStart}
+            cardNumber={cardNumber}
             bucket={w}
             infringements={weekInfringements.get(w.weekStart) ?? []}
             weeklyRest={weeklyRestByWeek.get(w.weekStart) ?? null}
@@ -162,10 +144,10 @@ export function WeeksPage() {
 
       <p className="text-xs text-(--color-muted)">
         Weekly limits are computed against the displayed Sunday–Saturday bucket. The EU regulatory
-        “fixed week” runs Monday 00:00 → Sunday 24:00 — totals near a Sun/Mon boundary may differ
+        "fixed week" runs Monday 00:00 → Sunday 24:00 — totals near a Sun/Mon boundary may differ
         from a strict compliance calculation. Weekly rest is detected only across periods where the
         card was inserted; long card-not-inserted gaps (e.g. card removed during a weekend) will
-        undercount real rest and may surface as “could not be confirmed”. Compensation tracking for
+        undercount real rest and may surface as "could not be confirmed". Compensation tracking for
         reduced weekly rests is not yet implemented.
       </p>
     </div>
@@ -223,10 +205,12 @@ function ComplianceHeadline({
 }
 
 function WeekCard({
+  cardNumber,
   bucket,
   infringements,
   weeklyRest,
 }: {
+  cardNumber: string;
   bucket: WeekBucket;
   infringements: Infringement[];
   weeklyRest: WeekRestAssessment | null;
@@ -262,7 +246,7 @@ function WeekCard({
             <h2 className="m-0 text-base font-semibold">{formatWeekRange(weekStart, weekEnd)}</h2>
             <ComplianceChip counts={counts} />
             <Link
-              to={`/print/week/${weekStart}`}
+              to={`/driver/${cardNumber}/print/week/${weekStart}`}
               className="rounded-md border border-(--color-border) bg-white/5 px-2 py-0.5 text-[0.65rem] uppercase tracking-wider text-(--color-muted) hover:bg-white/10 hover:text-white"
               title="Open a printable spreadsheet view of this week"
             >
@@ -278,26 +262,18 @@ function WeekCard({
           <WeekStat label="Work" value={formatHours(r.totalWorkMin)} />
           <WeekStat label="Rest" value={formatHours(r.totalRestMin)} />
           <WeekStat label="Distance" value={`${r.totalDistanceKm.toLocaleString()} km`} />
-          <WeekStat
-            label="Days driven"
-            value={`${r.daysWithDriving}/7`}
-          />
+          <WeekStat label="Days driven" value={`${r.daysWithDriving}/7`} />
           <WeekStat
             label="Over 9h"
             value={String(r.daysOverLimit)}
             warn={r.daysOverLimit > 0}
           />
-          <WeekStat
-            label="Weekly rest"
-            value={restValue}
-            warn={restWarn}
-            title={restTitle}
-          />
+          <WeekStat label="Weekly rest" value={restValue} warn={restWarn} title={restTitle} />
         </div>
       </div>
       <div className="grid grid-cols-7 gap-2">
         {days.map((d, i) => (
-          <DayCell key={i} dow={i} day={d} />
+          <DayCell key={i} cardNumber={cardNumber} dow={i} day={d} />
         ))}
       </div>
       {hasIssues && (
@@ -357,7 +333,15 @@ function WeekStat({
   );
 }
 
-function DayCell({ dow, day }: { dow: number; day: DailyStats | null }) {
+function DayCell({
+  cardNumber,
+  dow,
+  day,
+}: {
+  cardNumber: string;
+  dow: number;
+  day: DailyStats | null;
+}) {
   const label = dowLabel(dow);
   if (!day) {
     return (
@@ -369,7 +353,7 @@ function DayCell({ dow, day }: { dow: number; day: DailyStats | null }) {
   }
   return (
     <Link
-      to={`/day/${day.date}`}
+      to={`/driver/${cardNumber}/day/${day.date}`}
       state={{ from: 'weeks' }}
       className="flex flex-col gap-1 rounded-md border border-(--color-border) bg-black/15 px-2 py-2 text-center hover:bg-white/5"
     >
