@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import {
   Link,
   Outlet,
+  useFetcher,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -30,8 +31,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { ImportDDDFromBytes } from "../../wailsjs/go/main/App";
 import type { db } from "../../wailsjs/go/models";
+import type { ImportActionResult } from "../actions";
 import type { LayoutLoaderData } from "../loaders";
 
 export type LayoutCtx = {
@@ -53,46 +54,52 @@ export function AppLayout() {
   const navigate = useNavigate();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
+  const fetcher = useFetcher<ImportActionResult>();
+  const importing = fetcher.state !== "idle";
 
-  const [importing, setImporting] = useState(false);
+  // React to completed import actions. fetcher.data identity changes on every
+  // resolved submission, so this fires once per import.
+  const lastHandledRef = useRef<ImportActionResult | null>(null);
+  useEffect(() => {
+    const data = fetcher.data;
+    if (!data || data === lastHandledRef.current) return;
+    if (fetcher.state !== "idle") return;
+    lastHandledRef.current = data;
 
-  const importByBytes = useCallback(
-    async (filename: string, bytes: Uint8Array) => {
-      setImporting(true);
-      try {
-        const base64 = uint8ArrayToBase64(bytes);
-        const r = await ImportDDDFromBytes(filename, base64);
-        if (r) {
-          announceImport(r);
-          revalidator.revalidate();
-          if (r.driverCardNumber) {
-            navigate(`/driver/${r.driverCardNumber}`);
-          }
-        }
-      } catch (e: unknown) {
-        toast.error("Import failed", {
-          description: String((e as Error)?.message ?? e),
-        });
-      } finally {
-        setImporting(false);
+    if (data.ok) {
+      announceImport(data.result);
+      if (data.result.driverCardNumber) {
+        navigate(`/driver/${data.result.driverCardNumber}`);
       }
+    } else {
+      toast.error("Import failed", { description: data.message });
+    }
+  }, [fetcher.data, fetcher.state, navigate]);
+
+  const submitImport = useCallback(
+    (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      fetcher.submit(formData, {
+        method: "post",
+        action: "/import",
+        encType: "multipart/form-data",
+      });
     },
-    [navigate, revalidator],
+    [fetcher],
   );
 
   const onDrop = useCallback(
-    async (accepted: File[], rejected: FileRejection[]) => {
+    (accepted: File[], rejected: FileRejection[]) => {
       if (rejected.length > 0) {
         const names = rejected.map((r) => r.file.name).join(", ");
         toast.error("Not a .ddd file", { description: names });
         return;
       }
       const file = accepted[0];
-      if (!file) return;
-      const buffer = await file.arrayBuffer();
-      await importByBytes(file.name, new Uint8Array(buffer));
+      if (file) submitImport(file);
     },
-    [importByBytes],
+    [submitImport],
   );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -106,7 +113,9 @@ export function AppLayout() {
   const ctx = useMemo<LayoutCtx>(() => ({ openFilePicker: open }), [open]);
 
   const isLoading =
-    navigation.state === "loading" || revalidator.state === "loading";
+    importing ||
+    navigation.state === "loading" ||
+    revalidator.state === "loading";
 
   return (
     <div {...getRootProps({ className: "contents" })}>
@@ -206,11 +215,7 @@ function buildBreadcrumbs(
   return out;
 }
 
-function announceImport(r: {
-  alreadyImported: boolean;
-  filename: string;
-  counts?: Record<string, number>;
-}) {
+function announceImport(r: db.ImportResult) {
   const counts = r.counts ?? {};
   const summary = Object.entries(counts)
     .filter(([, v]) => v > 0)
@@ -218,23 +223,10 @@ function announceImport(r: {
     .join(" · ");
   const verb = r.alreadyImported ? "Already imported" : "Imported";
   const description = `${r.filename}${summary ? ` — ${summary}` : ""}`;
+
   if (r.alreadyImported) {
     toast.message(verb, { description });
   } else {
     toast.success(verb, { description });
   }
-}
-
-// Chunked base64 encoder — passing the whole Uint8Array through
-// String.fromCharCode(...) overflows the JS argument stack on MB-scale files.
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const chunkSize = 0x8000;
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode.apply(
-      null,
-      bytes.subarray(i, i + chunkSize) as unknown as number[],
-    );
-  }
-  return btoa(binary);
 }

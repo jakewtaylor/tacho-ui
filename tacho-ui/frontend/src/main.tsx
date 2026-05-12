@@ -5,6 +5,7 @@ import { createHashRouter, RouterProvider } from "react-router-dom";
 import "./style.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { importAction } from "./actions";
 import { AppLayout } from "./layouts/app-layout";
 import { driverLoader, layoutLoader } from "./loaders";
 import { DayPage } from "./pages/DayPage";
@@ -22,6 +23,7 @@ const router = createHashRouter([
     errorElement: <RouteError />,
     children: [
       { index: true, element: <Home /> },
+      { path: "import", action: importAction },
       {
         path: "driver/:cardNumber",
         id: "driver",
