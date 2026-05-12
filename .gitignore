@@ -10,16 +10,16 @@ output.err
 # kept here for source inspection only). Not part of this repo.
 /tachoparser/
 
-# tacho-ui build artefacts
-/tacho-ui/build/bin/
-/tacho-ui/tacho-ui
-/tacho-ui/frontend/dist/
-/tacho-ui/frontend/node_modules/
-/tacho-ui/frontend/package.json.md5
+# Build artefacts
+/build/bin/
+/tacho-ui
+/frontend/dist/
+/frontend/node_modules/
+/frontend/package.json.md5
 
 # Local-only env (Google Maps API key, etc.)
-/tacho-ui/frontend/.env
-/tacho-ui/frontend/.env.local
+/frontend/.env
+/frontend/.env.local
 
 # Editor / OS noise
 *.swp

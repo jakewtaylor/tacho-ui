@@ -4,8 +4,10 @@ A desktop tachograph file viewer. Drop a `.ddd` file in, see the contents.
 
 ## Layout
 
-- `tachoparser/` — local reference clone of `github.com/traconiq/tachoparser`. **Not a dependency** — tacho-ui pulls tachoparser as a normal Go module via `go get`. This directory is kept for source inspection only.
-- `tacho-ui/` — Wails v2 desktop app (Go backend + React-TS frontend). Currently the stock Wails React-TS template.
+The Wails app lives at the repo root (Go module `tacho-ui`). The `tachoparser/` sibling directory is reference material only.
+
+- `app.go`, `main.go`, `app_test.go`, `internal/`, `frontend/`, `build/`, `wails.json`, `go.mod` — the Wails v2 desktop app (Go backend + React-TS frontend).
+- `tachoparser/` — local reference clone of `github.com/traconiq/tachoparser`. **Not a dependency** — the app pulls tachoparser as a normal Go module via `go get`. This directory is kept for source inspection only.
 - `C_20260509_1146_M_TAYLOR_DB141641620128.ddd` — sample driver-card file (`C_` prefix = card).
 - `output.json` — sample parsed output from `dddparser -card` on the file above (~1.8 MB). Useful as a reference for the JSON shape the UI needs to render.
 
@@ -36,27 +38,32 @@ Then `encoding/json` marshal the struct. The decoder struct fields produce the s
 
 **For later — adding verification without a `replace` directive:**
 
-`internal/pkg/certificates` is Go-internal to `traconiq/tachoparser` so tacho-ui can't import it directly. But it doesn't need to — `PKsFirstGen` / `PKsSecondGen` are exported maps in `pkg/decoder`, and all the cert-loading types/methods (`CertificateFirstGen`, `cert.Decode()`, etc.) are exported. The internal package is just ~30 lines of glue that reads embedded `.bin` files and calls those exported APIs.
+`internal/pkg/certificates` is Go-internal to `traconiq/tachoparser` so we can't import it directly. But we don't need to — `PKsFirstGen` / `PKsSecondGen` are exported maps in `pkg/decoder`, and all the cert-loading types/methods (`CertificateFirstGen`, `cert.Decode()`, etc.) are exported. The internal package is just ~30 lines of glue that reads embedded `.bin` files and calls those exported APIs.
 
-So tacho-ui can ship its own `certs/pks{1,2}/*.bin` and a small `init()` that does the same loading itself — no fork, no `replace`, no path dependency. The local `tachoparser/` checkout here is reference material, not part of the build.
+So the app can ship its own `certs/pks{1,2}/*.bin` and a small `init()` that does the same loading itself — no fork, no `replace`, no path dependency. The local `tachoparser/` checkout here is reference material, not part of the build.
 
 ## Build prerequisites
 
-- Go 1.23+ (tacho-ui needs 1.23; tachoparser declares 1.19). User confirmed Go 1.26.3 installed.
+- Go 1.23+ (the app needs 1.23; tachoparser declares 1.19). User confirmed Go 1.26.3 installed.
 - For Wails: `wails` CLI + Node/npm for the frontend.
-- For signature verification (future, not POC): Python 3 + `requests` + `lxml`, then run `tachoparser/scripts/pks{1,2}/dl_all_pks{1,2}.py`. pks1 is currently downloaded into `tachoparser/internal/pkg/certificates/pks1/` (198 keys); pks2 is not — the JRC server is slow (~0.5s sleep per file). A `.venv` exists at `tachoparser/.venv` with the deps installed. When we actually wire up verification, those `.bin` files will need to live inside `tacho-ui/certs/` so they get embedded into the Wails binary.
+- For signature verification (future, not POC): Python 3 + `requests` + `lxml`, then run `tachoparser/scripts/pks{1,2}/dl_all_pks{1,2}.py`. pks1 is currently downloaded into `tachoparser/internal/pkg/certificates/pks1/` (198 keys); pks2 is not — the JRC server is slow (~0.5s sleep per file). A `.venv` exists at `tachoparser/.venv` with the deps installed. When we actually wire up verification, those `.bin` files will need to live inside `certs/` so they get embedded into the Wails binary.
 
 ## Running the pieces
 
+All commands run from the repo root.
+
 ```bash
 # Run the app in dev mode (hot reload, dev server at http://localhost:34115 for browser-side calls)
-cd tacho-ui && wails dev
+wails dev
 
-# Production build → tacho-ui/build/bin/tacho-ui.app
-cd tacho-ui && wails build
+# Production build → build/bin/tacho-ui.app
+wails build
 
 # Tests (parses the sample .ddd in-process and asserts driver fields)
-cd tacho-ui && go test -v
+go test -v
+
+# Frontend tests (vitest, rules-engine coverage)
+cd frontend && npm test
 
 # Standalone parser CLI (reference)
 ./tachoparser/cmd/dddparser/dddparser -card < C_20260509_1146_M_TAYLOR_DB141641620128.ddd > output.json
@@ -71,7 +78,7 @@ Persistent desktop app: SQLite-backed store + import flow + driver-scoped pages.
 - **`internal/db/`** — SQLite store via `modernc.org/sqlite` (pure-Go, no CGO). DB lives at `os.UserConfigDir()/tacho-ui/tacho.db` (on macOS: `~/Library/Application Support/tacho-ui/tacho.db`). Schema is in `internal/db/migrations/0001_init.sql`, applied via a numbered-migration runner that tracks state in `schema_migrations`. Read APIs return shapes that match the *post-extract* frontend types (so binding results are consumable directly — no `extract*` step).
 - **`internal/importer/`** — parses the file via tachoparser, marshals to JSON for storage (gzipped in `imports.raw_json` for safekeeping / future re-render), then unmarshals into a payload struct mirroring just the JSON paths we care about. Inserts in a single transaction with `INSERT OR REPLACE` for daily/place/gnss/events (last-write-wins on (driver, date) collisions across re-imports) and `INSERT OR IGNORE`-then-`UPDATE` for `drivers`/`vehicles`. Same SHA256 → `AlreadyImported=true`, prior import ID + driver returned.
 
-### Bound methods (`tacho-ui/app.go`)
+### Bound methods (`app.go`)
 
 - `ImportDDDDialog()` — open dialog, import. `nil` result + `nil` err = user cancelled.
 - `ImportDDDFromPath(path)` — import a specific path. Used by drag-drop.
@@ -116,7 +123,7 @@ Duration in each activity = `events[i+1].minutes - events[i].minutes` (clamped t
 
 The 9h / 10h daily driving thresholds are EU limits (9h standard, can extend to 10h twice per week).
 
-**Bound methods (`tacho-ui/app.go`):**
+**Bound methods (`app.go`):**
 
 - `OpenAndParseDDD() (*ParseResult, error)` — opens a native file dialog, parses the chosen file. Card-vs-VU auto-detected from filename (`C_` prefix → card).
 - `ParseDDDFromPath(path string) (*ParseResult, error)` — parses by absolute path; used by the Wails native file-drop handler.
@@ -132,7 +139,7 @@ The 9h / 10h daily driving thresholds are EU limits (9h standard, can extend to 
 
 **Events & faults** (`frontend/src/events.ts`, `eventTypes.ts`): card stores events and faults in separate arrays-of-arrays. `extractEventsAndFaults` flattens both and filters out empty/placeholder entries. `eventTypeLabel` maps EventFaultType codes (EU 2016/799 Annex IC App. 1 §2.70) to human labels — covers general events (0x0_), security breaches (0x1_, 0x2_), and recording-equipment faults (0x3_, 0x4_). The panel shows newest 30 entries with begin time, kind chip, type label, duration, and vehicle reg.
 
-**GNSS map** (`frontend/src/gnss.ts`, `MapPanel.tsx`): Gen-2 cards store ~every-3h-of-driving GNSS samples at `gnss_accumulated_driving.gnss_accumulated_driving_records[]` with lat/lng/timestamp/odometer. The map uses **Google Maps** via `@vis.gl/react-google-maps` — needs `VITE_GOOGLE_MAPS_API_KEY` set in `tacho-ui/frontend/.env.local` (and "Maps JavaScript API" enabled on the key in Google Cloud Console). Optional `VITE_GOOGLE_MAPS_MAP_ID` for cloud-styled basemap. If the key is missing, the panel renders a friendly setup-instructions card instead of crashing. Points render as `AdvancedMarker` dots, trip segments as `google.maps.Polyline` (imperative — the new lib has no Polyline component, so we set them via `useMap()`). Bounds auto-fit on data change. `dateFilter` ('yyyy-mm-dd') filters to a single UTC day; used on the day page.
+**GNSS map** (`frontend/src/gnss.ts`, `MapPanel.tsx`): Gen-2 cards store ~every-3h-of-driving GNSS samples at `gnss_accumulated_driving.gnss_accumulated_driving_records[]` with lat/lng/timestamp/odometer. The map uses **Google Maps** via `@vis.gl/react-google-maps` — needs `VITE_GOOGLE_MAPS_API_KEY` set in `frontend/.env.local` (and "Maps JavaScript API" enabled on the key in Google Cloud Console). Optional `VITE_GOOGLE_MAPS_MAP_ID` for cloud-styled basemap. If the key is missing, the panel renders a friendly setup-instructions card instead of crashing. Points render as `AdvancedMarker` dots, trip segments as `google.maps.Polyline` (imperative — the new lib has no Polyline component, so we set them via `useMap()`). Bounds auto-fit on data change. `dateFilter` ('yyyy-mm-dd') filters to a single UTC day; used on the day page.
 
 The legacy visx offline map (TopoJSON-based) packages (`@visx/geo`, `world-atlas`, `topojson-client`) remain installed but unused — tree-shaken out of the bundle.
 
@@ -193,18 +200,20 @@ The sample card illustrates why the inconclusive verdict matters: only 1 verifie
 
 **Wails docs:** https://wails.io/docs/
 
-**Regenerating TS bindings:** `wails generate module` from `tacho-ui/` after changing any bound Go method.
+**Regenerating TS bindings:** `wails generate module` from the repo root after changing any bound Go method.
 
 ## Testing
 
-`tacho-ui/app_test.go` contains a smoke test that loads the sample `.ddd`, parses it via `parseBytes`, and asserts driver name + card number match expected values. The test skips itself if the sample file isn't present. Run with `cd tacho-ui && go test -v`.
+`app_test.go` contains a smoke test that loads the sample `.ddd`, parses it through the importer, and asserts driver name + card number match expected values. The test skips itself if the sample file isn't present. Run with `go test -v` from the repo root.
+
+`frontend/src/*.test.ts` covers the rules engine (activity / weeklyRest / infringements) via vitest. Run with `cd frontend && npm test`.
 
 ## Repository state
 
-Neither the parent dir (`tachograph-viewer/`) nor `tacho-ui/` is a git repo yet; only the `tachoparser/` checkout is. If/when initialising git at the parent, make sure `.gitignore` excludes the sample `.ddd` file (PII) and `output.json`.
+The repo root is a git repo. The `tachoparser/` sibling is a separate checkout (its own `.git`). `.gitignore` excludes the sample `.ddd` (PII), the parsed `output.json/err`, the `tachoparser/` clone, and all build/node_modules/env artefacts.
 
 ## Notes / decisions
 
-- Working directory is `/Users/jake/code/tachograph-viewer`. The harness resets cwd to `tachoparser/` after each Bash call — always use absolute or repo-rooted paths.
+- Working directory is `/Users/jake/code/tachograph-viewer` (the repo root). All commands run from there — no more `cd tacho-ui` step.
 - The `.ddd` sample contains real PII (driver name "MARK WILLIAM TAYLOR", DOB, card number). Don't commit it or paste contents into anywhere logged.
 - `output.err` from the sample parse shows `warn: CHR mismatch` repeatedly — that's expected without pks2 keys (2nd-gen signature verification fails). The trailing `trying to wrap around for the second time, stop parsing` is the normal end-of-stream signal, not an error.

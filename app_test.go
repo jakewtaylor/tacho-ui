@@ -11,7 +11,7 @@ import (
 	"tacho-ui/internal/importer"
 )
 
-const samplePath = "../C_20260509_1146_M_TAYLOR_DB141641620128.ddd"
+const samplePath = "C_20260509_1146_M_TAYLOR_DB141641620128.ddd"
 
 // TestImportSampleCard imports the sample driver-card into a temp DB and
 // asserts that the resulting rows match what the dddparser CLI produced.
