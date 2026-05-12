@@ -99,8 +99,11 @@ export function DayPage() {
   const nextDate = idx < sortedDates.length - 1 ? sortedDates[idx + 1] : null;
   const stats: DailyStats = computeDailyStats(record);
   const detail = computeDayDetail(record);
-  const shift =
-    deriveShifts(data.placeRecords).find((s) => s.date === date) ?? null;
+  const shifts = useMemo(
+    () => deriveShifts(data.placeRecords),
+    [data.placeRecords],
+  );
+  const shift = shifts.find((s) => s.date === date) ?? null;
   const infringements = detectDayInfringements({ stats, detail, shift });
 
   return (

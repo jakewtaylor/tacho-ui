@@ -22,6 +22,7 @@ CREATE TABLE vehicles (
 );
 
 -- Each file we've ingested. Dedup by SHA256 of the raw .ddd bytes.
+-- (raw_json column added in 0001 and dropped in 0002.)
 CREATE TABLE imports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     filename TEXT NOT NULL,

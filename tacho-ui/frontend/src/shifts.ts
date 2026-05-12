@@ -8,13 +8,9 @@
 //
 // Records are paired begin → end to form a shift.
 
-export type PlaceRecord = {
-  entry_time: string;
-  entry_type_daily_work_period: number;
-  daily_work_period_country: number;
-  daily_work_period_region: number;
-  vehicle_odometer_value: number;
-};
+import type { db } from "../wailsjs/go/models";
+
+export type PlaceRecord = db.PlaceRecord;
 
 export type Shift = {
   date: string; // yyyy-mm-dd of the begin event

@@ -1,8 +1,6 @@
 package importer
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -71,11 +69,6 @@ func ImportCard(ctx context.Context, store *db.DB, filename string, data []byte)
 	}
 	cardNumber := ident.CardIdentification.CardNumber
 
-	gz, err := gzipBytes(rawJSON)
-	if err != nil {
-		return nil, fmt.Errorf("gzip raw json: %w", err)
-	}
-
 	tx, err := store.Conn().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -89,9 +82,9 @@ func ImportCard(ctx context.Context, store *db.DB, filename string, data []byte)
 	}
 
 	res, err := tx.ExecContext(ctx, `
-        INSERT INTO imports (filename, file_type, file_sha256, driver_card_number, imported_at, size_bytes, raw_json)
-        VALUES (?, 'card', ?, ?, ?, ?, ?)`,
-		filename, hashHex, cardNumber, now, int64(len(data)), gz,
+        INSERT INTO imports (filename, file_type, file_sha256, driver_card_number, imported_at, size_bytes)
+        VALUES (?, 'card', ?, ?, ?, ?)`,
+		filename, hashHex, cardNumber, now, int64(len(data)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert import: %w", err)
@@ -153,18 +146,6 @@ func LooksLikeCard(filename string) bool {
 func hashBytes(data []byte) string {
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:])
-}
-
-func gzipBytes(data []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	if _, err := gz.Write(data); err != nil {
-		return nil, err
-	}
-	if err := gz.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func findImportByHash(ctx context.Context, store *db.DB, hashHex string) (int64, string, bool, error) {

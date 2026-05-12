@@ -8,19 +8,15 @@
 // alias would require casts at every binding boundary.
 export type WorkType = number;
 
-export type ActivityChange = {
-  driver: boolean;
-  team: boolean;
-  card_present: boolean;
-  work_type: number;
-  minutes: number; // minutes since midnight
-};
+// DTO shapes come from the Wails-generated bindings — single source of truth
+// keyed off the Go struct tags. A rename on the Go side surfaces as a TS error.
+// Generated classes include a `convertValues` runtime helper on any type that
+// holds nested objects; we strip it from the public shape so structural object
+// literals (in tests, in fixtures) type-check.
+import type { db } from "../wailsjs/go/models";
 
-export type DailyRecord = {
-  activity_record_date: string;
-  activity_day_distance: number;
-  activity_change_info: ActivityChange[];
-};
+export type ActivityChange = db.ActivityChange;
+export type DailyRecord = Omit<db.DailyRecord, "convertValues">;
 
 export type DailyStats = {
   date: string; // ISO date (yyyy-mm-dd)

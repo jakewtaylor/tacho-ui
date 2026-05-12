@@ -1,9 +1,6 @@
-export type GnssPoint = {
-  timestamp: string;
-  longitude: number;
-  latitude: number;
-  odometer: number;
-};
+import type { db } from "../wailsjs/go/models";
+
+export type GnssPoint = db.GnssPoint;
 
 // Bounding box across all points, with a configurable padding factor.
 export function boundsOf(

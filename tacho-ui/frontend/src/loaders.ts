@@ -54,6 +54,9 @@ export async function driverLoader({
     });
   }
 
+  // `?? []` is load-bearing: a Go nil slice marshals to JSON `null`, so the
+  // Wails-generated TS types are `T[] | null`. We always hand consumers a real
+  // array.
   return {
     cardNumber,
     profile,

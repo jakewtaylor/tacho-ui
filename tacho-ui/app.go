@@ -25,15 +25,21 @@ func NewApp() *App {
 	return &App{}
 }
 
-// startup is called by Wails after the window is ready. We open the DB here
-// and stash the cancellation context for runtime calls (file dialogs, print).
+// startup is called by Wails after the window is ready. If the DB can't be
+// opened we surface a native dialog and quit — every binding below assumes a
+// live a.db, and silently degrading to empty driver lists is worse UX than
+// telling the user up front.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	store, err := db.Open(ctx)
 	if err != nil {
-		// Surface to the log; the UI will see empty driver lists and at least
-		// the next import attempt will produce a clearer error.
 		log.Printf("db.Open failed: %v", err)
+		_, _ = runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Tachograph Viewer — startup failed",
+			Message: fmt.Sprintf("Could not open the local database:\n\n%v\n\nThe app will now exit.", err),
+		})
+		runtime.Quit(ctx)
 		return
 	}
 	a.db = store
@@ -47,6 +53,17 @@ func (a *App) shutdown(_ context.Context) {
 	}
 }
 
+// store returns the live store, or an error if startup never completed
+// successfully. In practice startup quits the process on DB-open failure, so
+// this only fires during the brief interval between dialog dismissal and the
+// window actually closing.
+func (a *App) store() (*db.DB, error) {
+	if a.db == nil {
+		return nil, errors.New("database not initialised")
+	}
+	return a.db, nil
+}
+
 // ===== Imports =====
 
 // ImportDDDFromBytes imports a tachograph file uploaded from the frontend.
@@ -55,8 +72,9 @@ func (a *App) shutdown(_ context.Context) {
 // MB-scale files. Filename is used only for the .ddd extension check and as
 // the human-facing label in the imports table.
 func (a *App) ImportDDDFromBytes(filename string, dataBase64 string) (*db.ImportResult, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
 	data, err := base64.StdEncoding.DecodeString(dataBase64)
 	if err != nil {
@@ -67,81 +85,90 @@ func (a *App) ImportDDDFromBytes(filename string, dataBase64 string) (*db.Import
 		// silently doing nothing. This is the obvious next slice of work.
 		return nil, fmt.Errorf("only driver-card (C_*) files are supported in this build; got %s", filename)
 	}
-	return importer.ImportCard(a.ctx, a.db, filename, data)
+	return importer.ImportCard(a.ctx, store, filename, data)
 }
 
 // ListImports returns the imports for one driver, newest first.
 func (a *App) ListImports(cardNumber string) ([]db.ImportInfo, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.ListImports(a.ctx, cardNumber)
+	return store.ListImports(a.ctx, cardNumber)
 }
 
 // DeleteImport removes an import and (via FK cascade) every row sourced from
 // it. Returns true when something was actually deleted.
 func (a *App) DeleteImport(importID int64) (bool, error) {
-	if a.db == nil {
-		return false, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return false, err
 	}
-	return a.db.DeleteImport(a.ctx, importID)
+	return store.DeleteImport(a.ctx, importID)
 }
 
 // ===== Drivers =====
 
 // ListDrivers returns the driver landing-page list.
 func (a *App) ListDrivers() ([]db.DriverSummary, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.ListDrivers(a.ctx)
+	return store.ListDrivers(a.ctx)
 }
 
 // GetDriverProfile returns full identity + aggregates for one driver. Returns
 // nil result with nil error when the driver isn't found.
 func (a *App) GetDriverProfile(cardNumber string) (*db.DriverProfile, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.GetDriverProfile(a.ctx, cardNumber)
+	return store.GetDriverProfile(a.ctx, cardNumber)
 }
 
 // ===== Per-driver data fetches (shapes match the frontend's existing
 // post-extract TypeScript types so we can plug them straight in.) =====
 
 func (a *App) GetDailyRecords(cardNumber string) ([]db.DailyRecord, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.GetDailyRecords(a.ctx, cardNumber)
+	return store.GetDailyRecords(a.ctx, cardNumber)
 }
 
 func (a *App) GetPlaceRecords(cardNumber string) ([]db.PlaceRecord, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.GetPlaceRecords(a.ctx, cardNumber)
+	return store.GetPlaceRecords(a.ctx, cardNumber)
 }
 
 func (a *App) GetGnssPoints(cardNumber string) ([]db.GnssPoint, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.GetGnssPoints(a.ctx, cardNumber)
+	return store.GetGnssPoints(a.ctx, cardNumber)
 }
 
 func (a *App) GetEventsAndFaults(cardNumber string) ([]db.CardEvent, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.GetEventsAndFaults(a.ctx, cardNumber)
+	return store.GetEventsAndFaults(a.ctx, cardNumber)
 }
 
 func (a *App) GetDriverVehicles(cardNumber string) ([]db.DriverVehicle, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.GetDriverVehicles(a.ctx, cardNumber)
+	return store.GetDriverVehicles(a.ctx, cardNumber)
 }
 
 // ===== Misc =====
@@ -150,10 +177,11 @@ func (a *App) GetDriverVehicles(cardNumber string) ([]db.DriverVehicle, error) {
 // the frontend confirms with the user before calling this. Returns per-table
 // delete counts so the UI can surface what was actually removed.
 func (a *App) WipeDatabase() (*db.WipeStats, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
+	store, err := a.store()
+	if err != nil {
+		return nil, err
 	}
-	return a.db.Wipe(a.ctx)
+	return store.Wipe(a.ctx)
 }
 
 // PrintWindow triggers the native OS print dialog for the Wails window.

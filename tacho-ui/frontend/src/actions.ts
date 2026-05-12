@@ -1,10 +1,14 @@
 import type { ActionFunctionArgs } from "react-router-dom";
 
-import { ImportDDDFromBytes } from "../wailsjs/go/main/App";
+import { ImportDDDFromBytes, WipeDatabase } from "../wailsjs/go/main/App";
 import type { db } from "../wailsjs/go/models";
 
 export type ImportActionResult =
   | { ok: true; result: db.ImportResult }
+  | { ok: false; message: string };
+
+export type WipeActionResult =
+  | { ok: true; stats: db.WipeStats }
   | { ok: false; message: string };
 
 /**
@@ -43,6 +47,16 @@ export async function importAction({
     const base64 = uint8ArrayToBase64(new Uint8Array(buffer));
     const result = await ImportDDDFromBytes(file.name, base64);
     return { ok: true, result };
+  } catch (e: unknown) {
+    return { ok: false, message: String((e as Error)?.message ?? e) };
+  }
+}
+
+/** Resource-route action backing the "Wipe database" button. */
+export async function wipeAction(): Promise<WipeActionResult> {
+  try {
+    const stats = await WipeDatabase();
+    return { ok: true, stats };
   } catch (e: unknown) {
     return { ok: false, message: String((e as Error)?.message ?? e) };
   }

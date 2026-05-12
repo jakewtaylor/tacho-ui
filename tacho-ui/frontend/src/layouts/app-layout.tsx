@@ -57,15 +57,16 @@ export function AppLayout() {
   const fetcher = useFetcher<ImportActionResult>();
   const importing = fetcher.state !== "idle";
 
-  // React to completed import actions. fetcher.data identity changes on every
-  // resolved submission, so this fires once per import.
-  const lastHandledRef = useRef<ImportActionResult | null>(null);
+  // React to completed import actions. We fire on the state transition
+  // (non-idle → idle) rather than on data identity — that makes the effect's
+  // dependency on `fetcher.data` purely informational and avoids the
+  // "remember the last value we handled" dance.
+  const prevFetcherState = useRef(fetcher.state);
   useEffect(() => {
+    const prev = prevFetcherState.current;
+    prevFetcherState.current = fetcher.state;
+    if (prev === "idle" || fetcher.state !== "idle" || !fetcher.data) return;
     const data = fetcher.data;
-    if (!data || data === lastHandledRef.current) return;
-    if (fetcher.state !== "idle") return;
-    lastHandledRef.current = data;
-
     if (data.ok) {
       announceImport(data.result);
       if (data.result.driverCardNumber) {
@@ -74,7 +75,7 @@ export function AppLayout() {
     } else {
       toast.error("Import failed", { description: data.message });
     }
-  }, [fetcher.data, fetcher.state, navigate]);
+  }, [fetcher.state, fetcher.data, navigate]);
 
   const submitImport = useCallback(
     (file: File) => {

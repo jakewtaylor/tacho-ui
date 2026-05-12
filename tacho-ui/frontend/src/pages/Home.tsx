@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, useRevalidator } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { useFetcher, useNavigate } from "react-router-dom";
 import { Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,32 +40,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { WipeDatabase } from "../../wailsjs/go/main/App";
+import type { WipeActionResult } from "../actions";
 import { useLayoutCtx, useLayoutData } from "../layouts/app-layout";
 import { nationName } from "../nations";
 import { pageTitle, useDocumentTitle } from "../useDocumentTitle";
 
 export function Home() {
   const navigate = useNavigate();
-  const revalidator = useRevalidator();
   const { openFilePicker } = useLayoutCtx();
   const { drivers } = useLayoutData();
-  const [wiping, setWiping] = useState(false);
+  const wipeFetcher = useFetcher<WipeActionResult>();
+  const wiping = wipeFetcher.state !== "idle";
   useDocumentTitle(pageTitle("Drivers"));
 
-  async function handleWipe() {
-    setWiping(true);
-    try {
-      await WipeDatabase();
-      revalidator.revalidate();
-      toast.success("Database wiped");
-    } catch (e: unknown) {
-      toast.error("Wipe failed", {
-        description: String((e as Error)?.message ?? e),
-      });
-    } finally {
-      setWiping(false);
+  // Toast once when the wipe fetcher transitions back to idle.
+  const prevWipeState = useRef(wipeFetcher.state);
+  useEffect(() => {
+    const prev = prevWipeState.current;
+    prevWipeState.current = wipeFetcher.state;
+    if (prev === "idle" || wipeFetcher.state !== "idle" || !wipeFetcher.data) {
+      return;
     }
+    if (wipeFetcher.data.ok) {
+      toast.success("Database wiped");
+    } else {
+      toast.error("Wipe failed", { description: wipeFetcher.data.message });
+    }
+  }, [wipeFetcher.state, wipeFetcher.data]);
+
+  function handleWipe() {
+    wipeFetcher.submit(null, { method: "post", action: "/wipe" });
   }
 
   if (drivers.length === 0) {

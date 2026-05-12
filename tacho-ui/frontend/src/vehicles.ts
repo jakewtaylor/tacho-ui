@@ -1,11 +1,9 @@
-export type VehicleUsage = {
-  firstUse: string;
-  lastUse: string;
-  registration: string;
-  nation: number;
-  odoBegin: number;
-  odoEnd: number;
-};
+import type { db } from "../wailsjs/go/models";
+
+// VehicleUsage describes one driver→vehicle usage window. Shape matches the
+// Wails-generated db.DriverVehicle exactly — the TS alias just gives it a name
+// that reads more naturally on the consuming side.
+export type VehicleUsage = db.DriverVehicle;
 
 // Find the vehicle whose usage window overlaps the given shift window.
 // Vehicle records and shift records come from independent sources but should

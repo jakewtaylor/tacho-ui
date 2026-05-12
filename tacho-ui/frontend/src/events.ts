@@ -1,12 +1,6 @@
-export type CardEvent = {
-  // 'event' or 'fault' — kept as plain string to match the Wails binding shape.
-  kind: string;
-  type: number;
-  begin: string;
-  end: string | null;
-  vehicleRegistration: string;
-  vehicleNation: number;
-};
+import type { db } from "../wailsjs/go/models";
+
+export type CardEvent = db.CardEvent;
 
 export function durationMinutes(
   begin: string,

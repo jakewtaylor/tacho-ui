@@ -75,13 +75,15 @@ export function extractRestSpans(records: DailyRecord[]): RestSpan[] {
     );
     for (let i = 0; i < events.length; i++) {
       const cur = events[i];
+      // Guard against malformed events that would wrap into the next day.
+      if (cur.minutes < 0 || cur.minutes >= MIN_PER_DAY) continue;
       const nextMin =
         i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
       const dur = nextMin - cur.minutes;
       if (dur <= 0) continue;
       const isRest = cur.card_present === true && cur.work_type === 0;
       const startMs = dayBaseMs + cur.minutes * MS_PER_MIN;
-      const endMs = dayBaseMs + nextMin * MS_PER_MIN;
+      const endMs = dayBaseMs + Math.min(nextMin, MIN_PER_DAY) * MS_PER_MIN;
 
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
       if (last && last.isRest === isRest && last.endMs === startMs) {
@@ -127,6 +129,7 @@ export function extractPossibleRestSpans(records: DailyRecord[]): RestSpan[] {
     );
     for (let i = 0; i < events.length; i++) {
       const cur = events[i];
+      if (cur.minutes < 0 || cur.minutes >= MIN_PER_DAY) continue;
       const nextMin =
         i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
       const dur = nextMin - cur.minutes;
@@ -137,7 +140,7 @@ export function extractPossibleRestSpans(records: DailyRecord[]): RestSpan[] {
         (cur.card_present === true && cur.work_type === 0) ||
         cur.card_present === false;
       const startMs = dayBaseMs + cur.minutes * MS_PER_MIN;
-      const endMs = dayBaseMs + nextMin * MS_PER_MIN;
+      const endMs = dayBaseMs + Math.min(nextMin, MIN_PER_DAY) * MS_PER_MIN;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
       if (last && last.possibleRest === possible && last.endMs === startMs) {
         last.endMs = endMs;
@@ -175,13 +178,14 @@ export function extractAmbiguousSpans(records: DailyRecord[]): RestSpan[] {
     );
     for (let i = 0; i < events.length; i++) {
       const cur = events[i];
+      if (cur.minutes < 0 || cur.minutes >= MIN_PER_DAY) continue;
       const nextMin =
         i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
       const dur = nextMin - cur.minutes;
       if (dur <= 0) continue;
       const isAmbig = cur.card_present === false;
       const startMs = dayBaseMs + cur.minutes * MS_PER_MIN;
-      const endMs = dayBaseMs + nextMin * MS_PER_MIN;
+      const endMs = dayBaseMs + Math.min(nextMin, MIN_PER_DAY) * MS_PER_MIN;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
       if (last && last.isAmbig === isAmbig && last.endMs === startMs) {
         last.endMs = endMs;
