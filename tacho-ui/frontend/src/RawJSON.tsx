@@ -1,19 +1,33 @@
-import { useState } from 'react';
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function RawJSON({ json }: { json: string }) {
   const [show, setShow] = useState(false);
   return (
-    <section>
-      <button
+    <section className="flex flex-col gap-2">
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => setShow((v) => !v)}
-        className="h-7 rounded-md border border-(--color-border) bg-white/5 px-3 text-xs hover:bg-white/10"
+        className="self-start"
       >
-        {show ? 'Hide' : 'Show'} raw JSON ({json.length.toLocaleString()} bytes)
-      </button>
+        {show ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}
+        {show ? "Hide" : "Show"} raw JSON ({json.length.toLocaleString()} bytes)
+      </Button>
       {show && (
-        <pre className="mt-3 max-h-[60vh] overflow-auto rounded-lg border border-(--color-border) bg-black/35 p-4 font-mono text-xs leading-relaxed whitespace-pre">
-          {json}
-        </pre>
+        <Card>
+          <CardContent className="px-0">
+            <ScrollArea className="h-[60vh]">
+              <pre className="px-4 py-3 font-mono text-xs leading-relaxed whitespace-pre">
+                {json}
+              </pre>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       )}
     </section>
   );

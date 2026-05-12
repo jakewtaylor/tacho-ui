@@ -1,38 +1,46 @@
-import { useMemo } from 'react';
-import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
-import { DayDetail } from '../DayDetail';
-import { MapPanel } from '../MapPanel';
+import { useMemo } from "react";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { DayDetail } from "../DayDetail";
+import { MapPanel } from "../MapPanel";
 import {
   computeDailyStats,
   computeDayDetail,
   formatHours,
   type DailyStats,
-} from '../activity';
-import { deriveShifts } from '../shifts';
-import { detectDayInfringements } from '../infringements';
-import { InfringementsPanel } from '../InfringementsPanel';
-import { pageTitle, useDocumentTitle } from '../useDocumentTitle';
-import { useDriverData } from '../useDriverData';
+} from "../activity";
+import { deriveShifts } from "../shifts";
+import { detectDayInfringements } from "../infringements";
+import { InfringementsPanel } from "../InfringementsPanel";
+import { pageTitle, useDocumentTitle } from "../useDocumentTitle";
+import { useDriverData } from "../useDriverData";
 
 function formatHeading(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return date;
   return d.toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'UTC',
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
   });
 }
 
 export function DayPage() {
   const { cardNumber, date } = useParams<{ cardNumber: string; date: string }>();
   const navState = useLocation().state as { from?: string } | null;
-  const back =
-    navState?.from === 'weeks'
-      ? { to: `/driver/${cardNumber}/weeks`, label: '← Week view' }
-      : { to: `/driver/${cardNumber}`, label: '← Overview' };
   const { data, loading, error } = useDriverData(cardNumber);
 
   const sortedDates = useMemo(
@@ -40,45 +48,54 @@ export function DayPage() {
       (data?.dailyRecords ?? [])
         .map((r) => r.activity_record_date.slice(0, 10))
         .sort((a, b) => a.localeCompare(b)),
-    [data?.dailyRecords]
+    [data?.dailyRecords],
   );
 
   const driverName = useMemo(() => {
     const p = data?.profile;
     if (!p) return null;
-    return [p.firstNames, p.surname].filter(Boolean).join(' ') || p.cardNumber;
+    return [p.firstNames, p.surname].filter(Boolean).join(" ") || p.cardNumber;
   }, [data?.profile]);
-  useDocumentTitle(pageTitle(date && driverName ? `${date} — ${driverName}` : date ?? null));
+  useDocumentTitle(
+    pageTitle(date && driverName ? `${date} — ${driverName}` : (date ?? null)),
+  );
 
   if (!cardNumber || !date) return <Navigate to="/" replace />;
 
   if (error) {
     return (
-      <div className="rounded-md border border-(--color-warn)/60 bg-(--color-warn)/10 px-3 py-2 font-mono text-xs">
-        {error}
-      </div>
+      <Alert variant="destructive">
+        <AlertTitle>Failed to load day</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     );
   }
   if (loading || !data) {
-    return <div className="mt-16 text-center text-(--color-muted)">Loading day…</div>;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Loading day…</CardTitle>
+        </CardHeader>
+      </Card>
+    );
   }
 
   const idx = sortedDates.indexOf(date);
   const record = data.dailyRecords.find((r) => r.activity_record_date.slice(0, 10) === date);
+
   if (!record || idx === -1) {
     return (
-      <div className="rounded-lg border border-(--color-border) bg-(--color-surface) p-6 text-center">
-        <p className="mb-3 text-(--color-muted)">
-          No activity record found for{' '}
-          <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">{date}</code>.
-        </p>
-        <Link
-          to={`/driver/${cardNumber}`}
-          className="inline-block h-8 rounded-md border border-(--color-border) bg-white/5 px-3 text-sm leading-8 hover:bg-white/10"
-        >
-          Back to driver overview
-        </Link>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyTitle>No activity for {date}</EmptyTitle>
+          <EmptyDescription>
+            There’s no record for this date on this card.
+          </EmptyDescription>
+        </EmptyHeader>
+        <Button asChild variant="outline">
+          <Link to={`/driver/${cardNumber}`}>Back to driver overview</Link>
+        </Button>
+      </Empty>
     );
   }
 
@@ -90,40 +107,42 @@ export function DayPage() {
   const infringements = detectDayInfringements({ stats, detail, shift });
 
   return (
-    <div className="flex flex-col gap-5">
-      <Link to={back.to} className="self-start text-xs text-(--color-muted) hover:text-white">
-        {back.label}
-      </Link>
-
-      <header className="flex flex-col gap-3 rounded-lg border border-(--color-border) bg-(--color-surface) p-4">
-        <div className="flex items-center justify-between gap-2">
-          <NavButton
-            to={prevDate ? `/driver/${cardNumber}/day/${prevDate}` : null}
-            label="← Previous day"
-            state={navState}
-          />
-          <div className="flex flex-col items-center text-center">
-            <div className="text-xs text-(--color-muted) tabular-nums">{date}</div>
-            <h1 className="m-0 text-lg font-semibold">{formatHeading(date)}</h1>
-            <div className="text-xs text-(--color-muted)">
-              Day {idx + 1} of {sortedDates.length}
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader className="border-b">
+          <div className="flex items-center justify-between gap-2">
+            <NavButton
+              to={prevDate ? `/driver/${cardNumber}/day/${prevDate}` : null}
+              direction="prev"
+              state={navState}
+            />
+            <div className="flex flex-col items-center text-center">
+              <CardDescription className="font-mono tabular-nums">{date}</CardDescription>
+              <CardTitle className="text-xl">{formatHeading(date)}</CardTitle>
+              <CardDescription>
+                Day {idx + 1} of {sortedDates.length}
+              </CardDescription>
             </div>
+            <NavButton
+              to={nextDate ? `/driver/${cardNumber}/day/${nextDate}` : null}
+              direction="next"
+              state={navState}
+            />
           </div>
-          <NavButton
-            to={nextDate ? `/driver/${cardNumber}/day/${nextDate}` : null}
-            label="Next day →"
-            align="right"
-            state={navState}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <DayChip label="Driving" value={formatHours(stats.drivingMin)} warn={stats.overDailyLimit} />
-          <DayChip label="Work" value={formatHours(stats.workMin)} />
-          <DayChip label="Rest" value={formatHours(stats.restMin)} />
-          <DayChip label="Distance" value={`${stats.distanceKm.toLocaleString()} km`} />
-        </div>
-      </header>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <DayChip
+              label="Driving"
+              value={formatHours(stats.drivingMin)}
+              warn={stats.overDailyLimit}
+            />
+            <DayChip label="Work" value={formatHours(stats.workMin)} />
+            <DayChip label="Rest" value={formatHours(stats.restMin)} />
+            <DayChip label="Distance" value={`${stats.distanceKm.toLocaleString()} km`} />
+          </div>
+        </CardContent>
+      </Card>
 
       <InfringementsPanel items={infringements} linkDates={false} />
 
@@ -136,49 +155,50 @@ export function DayPage() {
 
 function NavButton({
   to,
-  label,
-  align = 'left',
+  direction,
   state,
 }: {
   to: string | null;
-  label: string;
-  align?: 'left' | 'right';
+  direction: "prev" | "next";
   state?: unknown;
 }) {
-  const justify = align === 'right' ? 'justify-end' : 'justify-start';
+  const Icon = direction === "prev" ? ChevronLeft : ChevronRight;
+  const label = direction === "prev" ? "Previous day" : "Next day";
   if (!to) {
     return (
-      <div className={`flex flex-1 ${justify}`}>
-        <span className="h-8 cursor-not-allowed rounded-md border border-(--color-border) bg-white/[0.02] px-3 text-sm leading-8 text-(--color-muted)/50">
-          {label}
-        </span>
-      </div>
+      <Button variant="ghost" size="sm" disabled>
+        {direction === "prev" && <Icon data-icon="inline-start" />}
+        {label}
+        {direction === "next" && <Icon data-icon="inline-end" />}
+      </Button>
     );
   }
   return (
-    <div className={`flex flex-1 ${justify}`}>
-      <Link
-        to={to}
-        state={state}
-        className="h-8 rounded-md border border-(--color-border) bg-white/5 px-3 text-sm leading-8 hover:bg-white/10"
-      >
+    <Button variant="outline" size="sm" asChild>
+      <Link to={to} state={state}>
+        {direction === "prev" && <Icon data-icon="inline-start" />}
         {label}
+        {direction === "next" && <Icon data-icon="inline-end" />}
       </Link>
-    </div>
+    </Button>
   );
 }
 
 function DayChip({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
-    <div className="rounded-md border border-(--color-border) bg-black/15 px-3 py-2">
-      <div className="text-[0.65rem] uppercase tracking-wider text-(--color-muted)">{label}</div>
-      <div
-        className={`mt-0.5 text-lg font-semibold tabular-nums ${
-          warn ? 'text-(--color-warn)' : ''
-        }`}
-      >
-        {value}
-      </div>
-    </div>
+    <Card size="sm">
+      <CardHeader>
+        <CardDescription className="uppercase tracking-wider">{label}</CardDescription>
+        <CardTitle
+          className={
+            "font-heading text-xl tabular-nums " +
+            (warn ? "inline-flex items-center gap-1 text-destructive" : "")
+          }
+        >
+          {warn && <TriangleAlert className="size-4" />}
+          {value}
+        </CardTitle>
+      </CardHeader>
+    </Card>
   );
 }

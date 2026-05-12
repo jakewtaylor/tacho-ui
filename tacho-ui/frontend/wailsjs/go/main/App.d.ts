@@ -16,9 +16,7 @@ export function GetGnssPoints(arg1:string):Promise<Array<db.GnssPoint>>;
 
 export function GetPlaceRecords(arg1:string):Promise<Array<db.PlaceRecord>>;
 
-export function ImportDDDDialog():Promise<db.ImportResult>;
-
-export function ImportDDDFromPath(arg1:string):Promise<db.ImportResult>;
+export function ImportDDDFromBytes(arg1:string,arg2:string):Promise<db.ImportResult>;
 
 export function ListDrivers():Promise<Array<db.DriverSummary>>;
 

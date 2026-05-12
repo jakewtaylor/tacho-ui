@@ -1,16 +1,19 @@
-import { useMemo, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { useMemo, useState } from "react";
+import { Link, Navigate, useParams } from "react-router-dom";
+import { ArrowLeft, Printer } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import {
   computeDailyStats,
   computeDayDetail,
   formatHours,
   type DailyRecord,
   type DailyStats,
-} from '../activity';
-import { deriveShifts, formatTimeOfDay, type Shift } from '../shifts';
-import { vehicleForShift, type VehicleUsage } from '../vehicles';
-import { driverSummaryFromProfile } from '../panels';
-import { dowLabel, formatWeekRange, groupByWeekSunday } from '../weeks';
+} from "../activity";
+import { deriveShifts, formatTimeOfDay, type Shift } from "../shifts";
+import { vehicleForShift, type VehicleUsage } from "../vehicles";
+import { driverSummaryFromProfile } from "../panels";
+import { dowLabel, formatWeekRange, groupByWeekSunday } from "../weeks";
 import {
   assessWeeklyRest,
   dataWindow,
@@ -18,24 +21,24 @@ import {
   extractPossibleRestSpans,
   extractRestSpans,
   type WeekRestAssessment,
-} from '../weeklyRest';
-import { detectWeekInfringements, type Infringement } from '../infringements';
-import { useDriverData } from '../useDriverData';
-import { useDocumentTitle } from '../useDocumentTitle';
-import { PrintWindow } from '../../wailsjs/go/main/App';
+} from "../weeklyRest";
+import { detectWeekInfringements, type Infringement } from "../infringements";
+import { useDriverData } from "../useDriverData";
+import { useDocumentTitle } from "../useDocumentTitle";
+import { PrintWindow } from "../../wailsjs/go/main/App";
 
 const COLUMNS = [
-  { key: 'date', label: 'Date' },
-  { key: 'day', label: 'Day' },
-  { key: 'start', label: 'Start' },
-  { key: 'end', label: 'End' },
-  { key: 'vehicle', label: 'Vehicle' },
-  { key: 'drive', label: 'Driving' },
-  { key: 'work', label: 'Work' },
-  { key: 'avail', label: 'Available' },
-  { key: 'rest', label: 'Rest' },
-  { key: 'distance', label: 'Distance' },
-  { key: 'notes', label: 'Notes' },
+  { key: "date", label: "Date" },
+  { key: "day", label: "Day" },
+  { key: "start", label: "Start" },
+  { key: "end", label: "End" },
+  { key: "vehicle", label: "Vehicle" },
+  { key: "drive", label: "Driving" },
+  { key: "work", label: "Work" },
+  { key: "avail", label: "Available" },
+  { key: "rest", label: "Rest" },
+  { key: "distance", label: "Distance" },
+  { key: "notes", label: "Notes" },
 ];
 
 export function PrintWeekPage() {
@@ -73,17 +76,17 @@ export function PrintWeekPage() {
 
   const driverSummary = useMemo(
     () => driverSummaryFromProfile(data?.profile ?? null),
-    [data?.profile]
+    [data?.profile],
   );
-  const driver = driverSummary.find((s) => s.label === 'Driver')?.value ?? '—';
+  const driver = driverSummary.find((s) => s.label === "Driver")?.value ?? "—";
   const cardNumberDisplay =
-    driverSummary.find((s) => s.label === 'Card number')?.value ?? cardNumber ?? '—';
+    driverSummary.find((s) => s.label === "Card number")?.value ?? cardNumber ?? "—";
 
-  const driverPart = driver && driver !== '—' ? sanitiseForFilename(driver) : 'driver';
+  const driverPart = driver && driver !== "—" ? sanitiseForFilename(driver) : "driver";
   useDocumentTitle(
     weekStart
       ? `Tachograph weekly - ${driverPart} - ${weekStart} to ${addDays(weekStart, 6)}`
-      : null
+      : null,
   );
 
   if (!cardNumber || !weekStart) return <Navigate to="/" replace />;
@@ -96,7 +99,7 @@ export function PrintWeekPage() {
     );
   }
   if (loading || !data || !computed) {
-    return <div className="p-8 text-sm text-(--color-muted)">Loading…</div>;
+    return <div className="p-8 text-sm text-gray-500">Loading…</div>;
   }
 
   const weekIdx = computed.weeks.findIndex((w) => w.weekStart === weekStart);
@@ -104,7 +107,7 @@ export function PrintWeekPage() {
     return (
       <div className="p-8">
         <p>
-          No data for week starting{' '}
+          No data for week starting{" "}
           <code className="rounded bg-gray-200 px-1.5 py-0.5">{weekStart}</code>.
         </p>
         <Link to={`/driver/${cardNumber}/weeks`} className="text-blue-600 underline">
@@ -121,7 +124,7 @@ export function PrintWeekPage() {
     computed.restSpans,
     computed.possibleRest,
     computed.ambiguous,
-    computed.win
+    computed.win,
   );
   const infringements: Infringement[] = detectWeekInfringements({
     week,
@@ -141,17 +144,18 @@ export function PrintWeekPage() {
       acc.distance += d.distanceKm;
       return acc;
     },
-    { drive: 0, work: 0, avail: 0, rest: 0, distance: 0 }
+    { drive: 0, work: 0, avail: 0, rest: 0, distance: 0 },
   );
 
   const restCell = (() => {
     if (weeklyRest.longestRest)
       return `${formatHours(weeklyRest.longestRest.durationMin)} (${weeklyRest.longestRest.start
-        .replace('T', ' ')
-        .slice(0, 16)} → ${weeklyRest.longestRest.end.replace('T', ' ').slice(0, 16)})`;
-    if (weeklyRest.inconclusive) return 'Inconclusive (card-not-inserted gap could contain a rest)';
-    if (weeklyRest.missing) return 'NONE recorded';
-    return '—';
+        .replace("T", " ")
+        .slice(0, 16)} → ${weeklyRest.longestRest.end.replace("T", " ").slice(0, 16)})`;
+    if (weeklyRest.inconclusive)
+      return "Inconclusive (card-not-inserted gap could contain a rest)";
+    if (weeklyRest.missing) return "NONE recorded";
+    return "—";
   })();
 
   return (
@@ -178,7 +182,10 @@ export function PrintWeekPage() {
                   {week.weekStart} → {week.weekEnd}
                 </td>
                 <th>Source</th>
-                <td>{data.profile.importCount} import{data.profile.importCount === 1 ? '' : 's'}</td>
+                <td>
+                  {data.profile.importCount} import
+                  {data.profile.importCount === 1 ? "" : "s"}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -251,7 +258,7 @@ export function PrintWeekPage() {
             <ol>
               {infringements.map((it, i) => (
                 <li key={i} className={`print-inf print-inf-${it.severity}`}>
-                  <span className="print-inf-sev">[{it.severity.toUpperCase()}]</span>{' '}
+                  <span className="print-inf-sev">[{it.severity.toUpperCase()}]</span>{" "}
                   <strong>{it.title}</strong>
                   {it.date && <span className="print-inf-date"> · {it.date}</span>}
                   <div className="print-inf-desc">{it.description}</div>
@@ -303,24 +310,24 @@ function DayRow({
   const rec = recordsByDate.get(date);
   const detail = rec ? computeDayDetail(rec) : null;
   const notes: string[] = [];
-  if (day?.wayOverDailyLimit) notes.push('> 10h drive');
-  else if (day?.overDailyLimit) notes.push('extension');
-  if (detail?.hasBreakBreach) notes.push('break breach');
-  if (shift?.shortRest) notes.push('< 11h rest before');
+  if (day?.wayOverDailyLimit) notes.push("> 10h drive");
+  else if (day?.overDailyLimit) notes.push("extension");
+  if (detail?.hasBreakBreach) notes.push("break breach");
+  if (shift?.shortRest) notes.push("< 11h rest before");
 
   return (
-    <tr className={day ? '' : 'print-empty'}>
+    <tr className={day ? "" : "print-empty"}>
       <td className="font-mono">{date}</td>
       <td>{dowLabel(dow)}</td>
-      <td>{shift ? formatTimeOfDay(shift.startTime) : '—'}</td>
-      <td>{shift?.endTime ? formatTimeOfDay(shift.endTime) : shift ? 'open' : '—'}</td>
-      <td className="font-mono">{vehicle?.registration ?? '—'}</td>
-      <td>{day ? formatHours(day.drivingMin) : '—'}</td>
-      <td>{day ? formatHours(day.workMin) : '—'}</td>
-      <td>{day ? formatHours(day.availableMin) : '—'}</td>
-      <td>{day ? formatHours(day.restMin) : '—'}</td>
-      <td>{day ? `${day.distanceKm.toLocaleString()} km` : '—'}</td>
-      <td>{notes.join(', ')}</td>
+      <td>{shift ? formatTimeOfDay(shift.startTime) : "—"}</td>
+      <td>{shift?.endTime ? formatTimeOfDay(shift.endTime) : shift ? "open" : "—"}</td>
+      <td className="font-mono">{vehicle?.registration ?? "—"}</td>
+      <td>{day ? formatHours(day.drivingMin) : "—"}</td>
+      <td>{day ? formatHours(day.workMin) : "—"}</td>
+      <td>{day ? formatHours(day.availableMin) : "—"}</td>
+      <td>{day ? formatHours(day.restMin) : "—"}</td>
+      <td>{day ? `${day.distanceKm.toLocaleString()} km` : "—"}</td>
+      <td>{notes.join(", ")}</td>
     </tr>
   );
 }
@@ -333,8 +340,8 @@ function addDays(yyyyMmDd: string, n: number): string {
 
 function sanitiseForFilename(s: string): string {
   return s
-    .replace(/[\\/:*?"<>|]+/g, '')
-    .replace(/\s+/g, ' ')
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -353,20 +360,20 @@ function PrintToolbar({ cardNumber }: { cardNumber: string }) {
   return (
     <div className="print-toolbar no-print">
       <div className="flex items-center gap-3">
-        <Link to={`/driver/${cardNumber}/weeks`} className="rounded border border-gray-300 px-3 py-1.5 text-sm">
-          ← Back to weeks
-        </Link>
+        <Button asChild size="sm" variant="outline">
+          <Link to={`/driver/${cardNumber}/weeks`}>
+            <ArrowLeft data-icon="inline-start" />
+            Back to weeks
+          </Link>
+        </Button>
         <span className="text-sm text-gray-600">Print preview</span>
       </div>
       <div className="flex items-center gap-2">
         {error && <span className="text-xs text-red-700">{error}</span>}
-        <button
-          onClick={printInApp}
-          className="rounded border border-gray-800 bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-black"
-          title="Open the native print dialog (Save as PDF available there)"
-        >
+        <Button size="sm" onClick={printInApp} title="Open the native print dialog (Save as PDF available there)">
+          <Printer data-icon="inline-start" />
           Print
-        </button>
+        </Button>
       </div>
     </div>
   );

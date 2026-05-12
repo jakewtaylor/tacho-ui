@@ -1,38 +1,39 @@
-import { useMemo } from 'react';
-import { Navigate, useOutletContext, useParams } from 'react-router-dom';
+import { useEffect, useMemo } from "react";
+import { Navigate, useParams } from "react-router-dom";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ActivityPanel,
   DriverSummaryPanel,
   EventsPanel,
   ShiftsPanel,
   driverSummaryFromProfile,
-} from '../panels';
-import { MapPanel } from '../MapPanel';
-import { pageTitle, useDocumentTitle } from '../useDocumentTitle';
-import { useDriverData } from '../useDriverData';
-import type { AppCtx } from '../App';
-
-export type { AppCtx } from '../App';
+} from "../panels";
+import { MapPanel } from "../MapPanel";
+import { pageTitle, useDocumentTitle } from "../useDocumentTitle";
+import { useDriverData } from "../useDriverData";
+import { useLayoutCtx } from "../layouts/app-layout";
 
 export function Overview() {
   const { cardNumber } = useParams<{ cardNumber: string }>();
-  const { importTick } = useOutletContext<AppCtx>();
-  const { data, loading, error } = useDriverData(cardNumber);
+  const { importTick } = useLayoutCtx();
+  const { data, loading, error, reload } = useDriverData(cardNumber);
 
-  // Refetch when the import counter ticks (e.g. user dropped another file
-  // while looking at this driver).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useMemo(() => {}, [importTick]);
+  useEffect(() => {
+    if (importTick > 0) reload();
+  }, [importTick, reload]);
 
   const summary = useMemo(
     () => driverSummaryFromProfile(data?.profile ?? null),
-    [data?.profile]
+    [data?.profile],
   );
 
   const driverName = useMemo(() => {
     const p = data?.profile;
     if (!p) return null;
-    return [p.firstNames, p.surname].filter(Boolean).join(' ') || p.cardNumber;
+    return [p.firstNames, p.surname].filter(Boolean).join(" ") || p.cardNumber;
   }, [data?.profile]);
   useDocumentTitle(pageTitle(driverName));
 
@@ -40,14 +41,28 @@ export function Overview() {
 
   if (error) {
     return (
-      <div className="rounded-md border border-(--color-warn)/60 bg-(--color-warn)/10 px-3 py-2 font-mono text-xs">
-        {error}
-      </div>
+      <Alert variant="destructive">
+        <AlertTitle>Failed to load driver</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     );
   }
 
   if (loading || !data) {
-    return <div className="mt-16 text-center text-(--color-muted)">Loading driver…</div>;
+    return (
+      <div className="flex flex-col gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Loading driver…</CardTitle>
+          </CardHeader>
+        </Card>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

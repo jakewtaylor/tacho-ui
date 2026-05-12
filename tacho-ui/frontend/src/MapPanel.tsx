@@ -1,22 +1,32 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from "react";
 import {
   APIProvider,
   Map,
   AdvancedMarker,
   useMap,
-} from '@vis.gl/react-google-maps';
-import { type GnssPoint } from './gnss';
+} from "@vis.gl/react-google-maps";
+import { MapPin } from "lucide-react";
+
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { type GnssPoint } from "./gnss";
 
 const HEIGHT = 420;
 
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
-const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID ?? 'TACHO_VIEWER_DARK';
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
+const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID ?? "TACHO_VIEWER_DARK";
 
 type Props = {
   points: GnssPoint[];
   /** yyyy-mm-dd — only show GNSS samples whose timestamp falls on this UTC date. */
   dateFilter?: string;
-  /** Optional override for the section heading. */
+  /** Optional override for the title. */
   title?: string;
 };
 
@@ -50,96 +60,91 @@ export function MapPanel({ points: allPoints, dateFilter, title }: Props) {
   if (allPoints.length === 0) return null;
 
   const headerText =
-    title ?? (dateFilter ? `Driving map · ${dateFilter}` : `Driving map · ${points.length.toLocaleString()} GNSS samples`);
+    title ??
+    (dateFilter
+      ? `Driving map · ${dateFilter}`
+      : `Driving map · ${points.length.toLocaleString()} GNSS samples`);
 
   if (!API_KEY) {
     return (
-      <section className="flex flex-col gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-(--color-muted)">
-          {headerText}
-        </h2>
-        <div className="rounded-lg border border-(--color-border) bg-(--color-surface) px-4 py-6 text-sm">
-          <p className="mb-2 font-semibold">Google Maps API key not configured</p>
-          <p className="text-(--color-muted)">
-            Create{' '}
-            <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">
-              tacho-ui/frontend/.env.local
-            </code>{' '}
-            with:
-          </p>
-          <pre className="mt-2 overflow-auto rounded bg-black/35 p-3 text-xs">
-{`VITE_GOOGLE_MAPS_API_KEY=your-key-here
-# Optional: a cloud-styled Map ID
-VITE_GOOGLE_MAPS_MAP_ID=your-map-id`}
-          </pre>
-          <p className="mt-2 text-xs text-(--color-muted)">
-            Enable "Maps JavaScript API" on the key in Google Cloud Console. Then{' '}
-            <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">wails dev</code>{' '}
-            (or rebuild) to pick it up.
-          </p>
-        </div>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>{headerText}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MapPin />
+              </EmptyMedia>
+              <EmptyTitle>Google Maps API key not configured</EmptyTitle>
+              <EmptyDescription>
+                Create <code className="rounded bg-muted px-1">frontend/.env.local</code> with{" "}
+                <code className="rounded bg-muted px-1">VITE_GOOGLE_MAPS_API_KEY</code>, enable the{" "}
+                "Maps JavaScript API" on the key, then restart <code>wails dev</code>.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </CardContent>
+      </Card>
     );
   }
 
   if (dateFilter && points.length === 0) {
     return (
-      <section className="flex flex-col gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-(--color-muted)">
-          {headerText}
-        </h2>
-        <div className="rounded-lg border border-(--color-border) bg-(--color-surface) px-4 py-6 text-center text-sm text-(--color-muted)">
-          No GNSS samples recorded for this day.
-        </div>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>{headerText}</CardTitle>
+          <CardDescription>No GNSS samples recorded for this day.</CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-(--color-muted)">
-        {headerText}
-      </h2>
-      <div className="overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">
-        <div style={{ height: HEIGHT }}>
-          <APIProvider apiKey={API_KEY}>
-            <Map
-              mapId={MAP_ID}
-              defaultCenter={{ lat: 51.5, lng: 0 }}
-              defaultZoom={5}
-              gestureHandling="greedy"
-              disableDefaultUI={false}
-              colorScheme="DARK"
-              clickableIcons={false}
-            >
-              <FitToPoints points={points} />
-              <Polylines segments={segments} />
-              {points.map((p, i) => (
-                <AdvancedMarker
-                  key={i}
-                  position={{ lat: p.latitude, lng: p.longitude }}
-                  title={`${p.timestamp.replace('T', ' ').replace('Z', '')} · ${p.latitude.toFixed(3)}, ${p.longitude.toFixed(3)}`}
-                >
-                  <div
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: '50%',
-                      background: 'oklch(0.78 0.18 145)',
-                      border: '2px solid white',
-                      boxShadow: '0 0 4px rgba(0,0,0,0.4)',
-                    }}
-                  />
-                </AdvancedMarker>
-              ))}
-            </Map>
-          </APIProvider>
-        </div>
-        <p className="px-3 py-2 text-xs text-(--color-muted)">
-          {points.length.toLocaleString()} GNSS samples. Lines connect consecutive samples within the same continuous driving window (gap &lt; 12h).
-        </p>
+    <Card className="overflow-hidden">
+      <CardHeader className="border-b">
+        <CardTitle>{headerText}</CardTitle>
+      </CardHeader>
+      <div style={{ height: HEIGHT }}>
+        <APIProvider apiKey={API_KEY}>
+          <Map
+            mapId={MAP_ID}
+            defaultCenter={{ lat: 51.5, lng: 0 }}
+            defaultZoom={5}
+            gestureHandling="greedy"
+            disableDefaultUI={false}
+            colorScheme="DARK"
+            clickableIcons={false}
+          >
+            <FitToPoints points={points} />
+            <Polylines segments={segments} />
+            {points.map((p, i) => (
+              <AdvancedMarker
+                key={i}
+                position={{ lat: p.latitude, lng: p.longitude }}
+                title={`${p.timestamp.replace("T", " ").replace("Z", "")} · ${p.latitude.toFixed(3)}, ${p.longitude.toFixed(3)}`}
+              >
+                <div
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: "var(--color-driving)",
+                    border: "2px solid white",
+                    boxShadow: "0 0 4px rgba(0,0,0,0.4)",
+                  }}
+                />
+              </AdvancedMarker>
+            ))}
+          </Map>
+        </APIProvider>
       </div>
-    </section>
+      <CardFooter className="text-xs text-muted-foreground">
+        {points.length.toLocaleString()} GNSS samples. Lines connect consecutive samples within the same
+        continuous driving window (gap &lt; 12h).
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -170,7 +175,7 @@ function Polylines({ segments }: { segments: GnssPoint[][] }) {
       if (seg.length < 2) continue;
       const polyline = new google.maps.Polyline({
         path: seg.map((p) => ({ lat: p.latitude, lng: p.longitude })),
-        strokeColor: '#4ade80',
+        strokeColor: "#4ade80",
         strokeOpacity: 0.85,
         strokeWeight: 3,
         geodesic: true,

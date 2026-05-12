@@ -1,153 +1,226 @@
-import { useEffect, useState } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
-import { ListDrivers, WipeDatabase } from '../../wailsjs/go/main/App';
-import type { db } from '../../wailsjs/go/models';
-import { nationName } from '../nations';
-import { pageTitle, useDocumentTitle } from '../useDocumentTitle';
-import type { AppCtx } from '../App';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Trash2, Upload, Users } from "lucide-react";
+import { toast } from "sonner";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ListDrivers, WipeDatabase } from "../../wailsjs/go/main/App";
+import type { db } from "../../wailsjs/go/models";
+import { nationName } from "../nations";
+import { pageTitle, useDocumentTitle } from "../useDocumentTitle";
+import { useLayoutCtx } from "../layouts/app-layout";
 
 export function Home() {
-  const { importTick, triggerImport } = useOutletContext<AppCtx>();
-  const [drivers, setDrivers] = useState<db.DriverSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { importTick, openFilePicker, drivers: cached, reloadDrivers } = useLayoutCtx();
+  const [drivers, setDrivers] = useState<db.DriverSummary[] | null>(cached);
   const [wiping, setWiping] = useState(false);
-  const [reloadTick, setReloadTick] = useState(0);
-  useDocumentTitle(pageTitle('Drivers'));
+  useDocumentTitle(pageTitle("Drivers"));
+
+  useEffect(() => {
+    setDrivers(cached);
+  }, [cached]);
 
   useEffect(() => {
     let cancelled = false;
-    setError(null);
     ListDrivers()
-      .then((d) => {
-        if (!cancelled) setDrivers(d ?? []);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(String((e as Error)?.message ?? e));
-      });
+      .then((d) => !cancelled && setDrivers(d ?? []))
+      .catch((e: unknown) =>
+        toast.error("Failed to load drivers", {
+          description: String((e as Error)?.message ?? e),
+        }),
+      );
     return () => {
       cancelled = true;
     };
-  }, [importTick, reloadTick]);
+  }, [importTick]);
 
   async function handleWipe() {
-    const driverCount = drivers?.length ?? 0;
-    if (driverCount === 0) {
-      // Empty DB — wipe is a no-op but still confirm in case something is mid-import.
-      if (!window.confirm('The database is already empty. Wipe anyway?')) return;
-    } else {
-      const totalDays = drivers!.reduce((sum, d) => sum + d.dailyRecordCount, 0);
-      const totalImports = drivers!.reduce((sum, d) => sum + d.importCount, 0);
-      const msg =
-        `Wipe the database?\n\n` +
-        `This will permanently delete:\n` +
-        `  • ${driverCount} driver${driverCount === 1 ? '' : 's'}\n` +
-        `  • ${totalImports} import${totalImports === 1 ? '' : 's'}\n` +
-        `  • ${totalDays.toLocaleString()} daily record${totalDays === 1 ? '' : 's'}\n` +
-        `  • all associated shifts, GNSS points, and events\n\n` +
-        `This cannot be undone.`;
-      // if (!window.confirm(msg)) return;
-    }
     setWiping(true);
-    setError(null);
     try {
       await WipeDatabase();
-      setReloadTick((t) => t + 1);
+      reloadDrivers();
+      toast.success("Database wiped");
     } catch (e: unknown) {
-      setError(String((e as Error)?.message ?? e));
+      toast.error("Wipe failed", { description: String((e as Error)?.message ?? e) });
     } finally {
       setWiping(false);
     }
   }
 
-  if (error) {
-    return (
-      <div className="rounded-md border border-(--color-warn)/60 bg-(--color-warn)/10 px-3 py-2 font-mono text-xs">
-        {error}
-      </div>
-    );
-  }
-
   if (drivers === null) {
-    return <div className="mt-16 text-center text-(--color-muted)">Loading…</div>;
+    return <DriversLoading />;
   }
 
   if (drivers.length === 0) {
     return (
-      <div className="mt-16 flex flex-col items-center gap-4 text-center">
-        <div className="text-lg font-semibold">No drivers yet</div>
-        <p className="max-w-md text-sm text-(--color-muted)">
-          Import a driver-card{' '}
-          <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">.ddd</code> file to get
-          started. Drag-and-drop also works.
-        </p>
-        <button
-          onClick={triggerImport}
-          className="h-9 rounded-md border border-(--color-border) bg-white/5 px-4 text-sm hover:bg-white/10"
-        >
-          Import .ddd file
-        </button>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Upload />
+          </EmptyMedia>
+          <EmptyTitle>No drivers yet</EmptyTitle>
+          <EmptyDescription>
+            Import a driver-card <code className="rounded bg-muted px-1">.ddd</code> file to get
+            started. Drag-and-drop also works.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button onClick={openFilePicker}>
+            <Upload data-icon="inline-start" />
+            Import .ddd file
+          </Button>
+        </EmptyContent>
+      </Empty>
     );
   }
 
+  const totalDays = drivers.reduce((sum, d) => sum + d.dailyRecordCount, 0);
+  const totalImports = drivers.reduce((sum, d) => sum + d.importCount, 0);
+
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="m-0 text-base font-semibold">
-          {drivers.length} driver{drivers.length === 1 ? '' : 's'}
-        </h2>
-        <div className="flex items-center gap-3">
-          <p className="text-xs text-(--color-muted)">
-            Click a driver to view their activity, weekly summary, and infringements.
-          </p>
-          <button
-            onClick={handleWipe}
-            disabled={wiping}
-            className="rounded-md border border-(--color-warn)/40 bg-(--color-warn)/10 px-3 py-1 text-xs text-(--color-warn) hover:bg-(--color-warn)/20 disabled:cursor-progress disabled:opacity-50"
-            title="Delete every imported driver, import, and record (for testing)"
-          >
-            {wiping ? 'Wiping…' : 'Wipe database'}
-          </button>
-        </div>
-      </header>
-      <div className="overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">
-        <div
-          className="grid gap-x-3 bg-black/15 px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-wider text-(--color-muted)"
-          style={{ gridTemplateColumns: '1fr 180px 160px 100px 100px' }}
-        >
-          <div>Driver</div>
-          <div>Card number</div>
-          <div>Data range</div>
-          <div className="text-right">Days</div>
-          <div className="text-right">Imports</div>
-        </div>
-        {drivers.map((d) => {
-          const name = [d.firstNames, d.surname].filter(Boolean).join(' ') || '(unknown)';
-          return (
-            <Link
-              key={d.cardNumber}
-              to={`/driver/${d.cardNumber}`}
-              className="grid items-center gap-x-3 border-t border-(--color-border) px-4 py-2 text-sm tabular-nums first:border-t-0 hover:bg-white/5"
-              style={{ gridTemplateColumns: '1fr 180px 160px 100px 100px' }}
-            >
-              <div>
-                <div className="font-medium">{name}</div>
-                {d.issuingState ? (
-                  <div className="text-[0.65rem] text-(--color-muted)">
-                    {nationName(d.issuingState)}
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle className="flex items-center gap-2">
+          <Users className="size-4" />
+          {drivers.length} driver{drivers.length === 1 ? "" : "s"}
+        </CardTitle>
+        <CardDescription>
+          Click a driver to view their activity, weekly summary, and infringements.
+        </CardDescription>
+        <CardAction>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={wiping}>
+                <Trash2 data-icon="inline-start" />
+                {wiping ? "Wiping…" : "Wipe database"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Wipe the database?</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2">
+                    <p>This will permanently delete:</p>
+                    <ul className="ml-4 list-disc">
+                      <li>
+                        {drivers.length} driver{drivers.length === 1 ? "" : "s"}
+                      </li>
+                      <li>
+                        {totalImports} import{totalImports === 1 ? "" : "s"}
+                      </li>
+                      <li>
+                        {totalDays.toLocaleString()} daily record
+                        {totalDays === 1 ? "" : "s"}
+                      </li>
+                      <li>all associated shifts, GNSS points, and events</li>
+                    </ul>
+                    <p>This cannot be undone.</p>
                   </div>
-                ) : null}
-              </div>
-              <div className="font-mono text-xs">{d.cardNumber}</div>
-              <div className="font-mono text-xs text-(--color-muted)">
-                {d.firstDate && d.lastDate ? `${d.firstDate} → ${d.lastDate}` : '—'}
-              </div>
-              <div className="text-right">{d.dailyRecordCount.toLocaleString()}</div>
-              <div className="text-right">{d.importCount}</div>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleWipe} disabled={wiping}>
+                  Wipe everything
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="px-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-4">Driver</TableHead>
+              <TableHead>Card number</TableHead>
+              <TableHead>Data range</TableHead>
+              <TableHead className="text-right">Days</TableHead>
+              <TableHead className="pr-4 text-right">Imports</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {drivers.map((d) => {
+              const name = [d.firstNames, d.surname].filter(Boolean).join(" ") || "(unknown)";
+              return (
+                <TableRow
+                  key={d.cardNumber}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/driver/${d.cardNumber}`)}
+                >
+                  <TableCell className="pl-4">
+                    <div className="font-medium">{name}</div>
+                    {d.issuingState ? (
+                      <div className="text-[0.65rem] text-muted-foreground">
+                        {nationName(d.issuingState)}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{d.cardNumber}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {d.firstDate && d.lastDate
+                      ? `${d.firstDate} → ${d.lastDate}`
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {d.dailyRecordCount.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="pr-4 text-right tabular-nums">
+                    <Badge variant="secondary">{d.importCount}</Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DriversLoading() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Loading drivers…</CardTitle>
+      </CardHeader>
+    </Card>
   );
 }

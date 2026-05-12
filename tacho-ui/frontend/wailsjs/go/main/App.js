@@ -30,12 +30,8 @@ export function GetPlaceRecords(arg1) {
   return window['go']['main']['App']['GetPlaceRecords'](arg1);
 }
 
-export function ImportDDDDialog() {
-  return window['go']['main']['App']['ImportDDDDialog']();
-}
-
-export function ImportDDDFromPath(arg1) {
-  return window['go']['main']['App']['ImportDDDFromPath'](arg1);
+export function ImportDDDFromBytes(arg1, arg2) {
+  return window['go']['main']['App']['ImportDDDFromBytes'](arg1, arg2);
 }
 
 export function ListDrivers() {

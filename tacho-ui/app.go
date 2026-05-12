@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -50,48 +49,25 @@ func (a *App) shutdown(_ context.Context) {
 
 // ===== Imports =====
 
-// ImportDDDDialog shows a native file picker, then imports the chosen file.
-// Returns nil result with nil error when the user cancels.
-func (a *App) ImportDDDDialog() (*db.ImportResult, error) {
+// ImportDDDFromBytes imports a tachograph file uploaded from the frontend.
+// The file is delivered as base64-encoded bytes — JSON can't carry raw binary
+// efficiently, and base64 sidesteps a Wails []byte → number[] explosion for
+// MB-scale files. Filename is used only for the .ddd extension check and as
+// the human-facing label in the imports table.
+func (a *App) ImportDDDFromBytes(filename string, dataBase64 string) (*db.ImportResult, error) {
 	if a.db == nil {
 		return nil, errors.New("database not initialised")
 	}
-	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Select a tachograph file",
-		Filters: []runtime.FileFilter{{
-			DisplayName: "Tachograph files (*.ddd)",
-			Pattern:     "*.ddd;*.DDD",
-		}},
-	})
+	data, err := base64.StdEncoding.DecodeString(dataBase64)
 	if err != nil {
-		return nil, fmt.Errorf("open dialog: %w", err)
+		return nil, fmt.Errorf("decode base64: %w", err)
 	}
-	if path == "" {
-		return nil, nil
-	}
-	return a.importPath(path)
-}
-
-// ImportDDDFromPath imports a file by absolute path. Used by the native drop handler.
-func (a *App) ImportDDDFromPath(path string) (*db.ImportResult, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialised")
-	}
-	return a.importPath(path)
-}
-
-func (a *App) importPath(path string) (*db.ImportResult, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read file: %w", err)
-	}
-	name := filepath.Base(path)
-	if !importer.LooksLikeCard(name) {
+	if !importer.LooksLikeCard(filename) {
 		// VU imports aren't wired up yet — keep the error explicit rather than
 		// silently doing nothing. This is the obvious next slice of work.
-		return nil, fmt.Errorf("only driver-card (C_*) files are supported in this build; got %s", name)
+		return nil, fmt.Errorf("only driver-card (C_*) files are supported in this build; got %s", filename)
 	}
-	return importer.ImportCard(a.ctx, a.db, name, data)
+	return importer.ImportCard(a.ctx, a.db, filename, data)
 }
 
 // ListImports returns the imports for one driver, newest first.
