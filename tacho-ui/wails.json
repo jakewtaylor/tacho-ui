@@ -9,5 +9,16 @@
   "author": {
     "name": "Jake Taylor",
     "email": "me@jaketaylor.co"
+  },
+  "info": {
+    "fileAssociations": [
+      {
+        "ext": "ddd",
+        "name": "Tachograph Data",
+        "description": "Tachograph driver-card download",
+        "iconName": "dddFileIcon",
+        "role": "Viewer"
+      }
+    ]
   }
 }

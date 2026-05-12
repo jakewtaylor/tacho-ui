@@ -34,12 +34,20 @@ export function ImportDDDFromBytes(arg1, arg2) {
   return window['go']['main']['App']['ImportDDDFromBytes'](arg1, arg2);
 }
 
+export function ImportDDDFromPath(arg1) {
+  return window['go']['main']['App']['ImportDDDFromPath'](arg1);
+}
+
 export function ListDrivers() {
   return window['go']['main']['App']['ListDrivers']();
 }
 
 export function ListImports(arg1) {
   return window['go']['main']['App']['ListImports'](arg1);
+}
+
+export function PendingFileOpens() {
+  return window['go']['main']['App']['PendingFileOpens']();
 }
 
 export function PrintWindow() {

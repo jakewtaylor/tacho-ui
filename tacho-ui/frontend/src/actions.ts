@@ -1,6 +1,10 @@
 import type { ActionFunctionArgs } from "react-router-dom";
 
-import { ImportDDDFromBytes, WipeDatabase } from "../wailsjs/go/main/App";
+import {
+  ImportDDDFromBytes,
+  ImportDDDFromPath,
+  WipeDatabase,
+} from "../wailsjs/go/main/App";
 import type { db } from "../wailsjs/go/models";
 
 export type ImportActionResult =
@@ -46,6 +50,36 @@ export async function importAction({
     const buffer = await file.arrayBuffer();
     const base64 = uint8ArrayToBase64(new Uint8Array(buffer));
     const result = await ImportDDDFromBytes(file.name, base64);
+    return { ok: true, result };
+  } catch (e: unknown) {
+    return { ok: false, message: String((e as Error)?.message ?? e) };
+  }
+}
+
+/**
+ * Resource-route action backing the OS-driven file-association flow. The
+ * AppLayout receives a path from `OnFileOpen` (or the pending-files drain),
+ * prompts the user, and submits a single `path` form field here on confirm.
+ * The Go side reads the file directly — no base64 round-trip needed.
+ */
+export async function importFromPathAction({
+  request,
+}: ActionFunctionArgs): Promise<ImportActionResult> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch (e: unknown) {
+    return {
+      ok: false,
+      message: `Bad form data: ${String((e as Error)?.message ?? e)}`,
+    };
+  }
+  const path = formData.get("path");
+  if (typeof path !== "string" || !path) {
+    return { ok: false, message: "No path provided" };
+  }
+  try {
+    const result = await ImportDDDFromPath(path);
     return { ok: true, result };
   } catch (e: unknown) {
     return { ok: false, message: String((e as Error)?.message ?? e) };

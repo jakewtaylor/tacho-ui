@@ -5,7 +5,7 @@ import { createHashRouter, RouterProvider } from "react-router-dom";
 import "./style.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { importAction, wipeAction } from "./actions";
+import { importAction, importFromPathAction, wipeAction } from "./actions";
 import { AppLayout } from "./layouts/app-layout";
 import { driverLoader, layoutLoader } from "./loaders";
 import { DayPage } from "./pages/DayPage";
@@ -24,6 +24,7 @@ const router = createHashRouter([
     children: [
       { index: true, element: <Home /> },
       { path: "import", action: importAction },
+      { path: "import-from-path", action: importFromPathAction },
       { path: "wipe", action: wipeAction },
       {
         path: "driver/:cardNumber",

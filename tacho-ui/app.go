@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -13,16 +16,56 @@ import (
 	"tacho-ui/internal/importer"
 )
 
+// fileOpenedEvent is the runtime-event name the frontend listens on when the
+// OS hands us a file to import (file-association double-click, `open foo.ddd`,
+// a second instance launched with a path on Windows).
+const fileOpenedEvent = "file-opened"
+
 // App is the Wails-bound surface. It owns the SQLite store for the lifetime of
 // the process. All bound methods that read or write tachograph data go through
 // the DB; the in-memory "parse JSON each open" path from the POC is gone.
 type App struct {
 	ctx context.Context
 	db  *db.DB
+
+	// pendingFiles buffers any file paths the OS hands us before the frontend
+	// is mounted and ready to receive events. OnFileOpen on macOS reliably
+	// fires before startup completes when the app is cold-launched via
+	// double-click. The frontend drains this via PendingFileOpens() on mount.
+	pendingMu    sync.Mutex
+	pendingFiles []string
 }
 
 func NewApp() *App {
 	return &App{}
+}
+
+// handleOpenedFiles is invoked from Mac.OnFileOpen (cold-launch and warm) and
+// from SingleInstanceLock.OnSecondInstanceLaunch (Windows). It queues the
+// paths and, if the frontend is already running, emits a runtime event so the
+// dialog can pop immediately.
+func (a *App) handleOpenedFiles(paths []string) {
+	if len(paths) == 0 {
+		return
+	}
+	a.pendingMu.Lock()
+	a.pendingFiles = append(a.pendingFiles, paths...)
+	ctx := a.ctx
+	a.pendingMu.Unlock()
+	if ctx != nil {
+		runtime.EventsEmit(ctx, fileOpenedEvent, paths)
+	}
+}
+
+// PendingFileOpens drains and returns any file paths the OS handed us before
+// the frontend was ready. The frontend calls this on mount and also subscribes
+// to the `file-opened` runtime event for the warm-launch case.
+func (a *App) PendingFileOpens() []string {
+	a.pendingMu.Lock()
+	defer a.pendingMu.Unlock()
+	out := a.pendingFiles
+	a.pendingFiles = nil
+	return out
 }
 
 // startup is called by Wails after the window is ready. If the DB can't be
@@ -83,6 +126,26 @@ func (a *App) ImportDDDFromBytes(filename string, dataBase64 string) (*db.Import
 	if !importer.LooksLikeCard(filename) {
 		// VU imports aren't wired up yet — keep the error explicit rather than
 		// silently doing nothing. This is the obvious next slice of work.
+		return nil, fmt.Errorf("only driver-card (C_*) files are supported in this build; got %s", filename)
+	}
+	return importer.ImportCard(a.ctx, store, filename, data)
+}
+
+// ImportDDDFromPath reads and imports a file by absolute path. Used by the
+// file-association flow on macOS (double-click a .ddd → OnFileOpen → frontend
+// dialog confirms → this binding) and by the Windows command-line argv path.
+// Skips the base64 round-trip the bytes-based binding needs.
+func (a *App) ImportDDDFromPath(path string) (*db.ImportResult, error) {
+	store, err := a.store()
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	filename := filepath.Base(path)
+	if !importer.LooksLikeCard(filename) {
 		return nil, fmt.Errorf("only driver-card (C_*) files are supported in this build; got %s", filename)
 	}
 	return importer.ImportCard(a.ctx, store, filename, data)

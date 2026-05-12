@@ -18,9 +18,13 @@ export function GetPlaceRecords(arg1:string):Promise<Array<db.PlaceRecord>>;
 
 export function ImportDDDFromBytes(arg1:string,arg2:string):Promise<db.ImportResult>;
 
+export function ImportDDDFromPath(arg1:string):Promise<db.ImportResult>;
+
 export function ListDrivers():Promise<Array<db.DriverSummary>>;
 
 export function ListImports(arg1:string):Promise<Array<db.ImportInfo>>;
+
+export function PendingFileOpens():Promise<Array<string>>;
 
 export function PrintWindow():Promise<void>;
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import {
   Link,
@@ -17,6 +17,16 @@ import { toast } from "sonner";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
@@ -31,9 +41,18 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { PendingFileOpens } from "../../wailsjs/go/main/App";
+import { EventsOn } from "../../wailsjs/runtime/runtime";
 import type { db } from "../../wailsjs/go/models";
 import type { ImportActionResult } from "../actions";
 import type { LayoutLoaderData } from "../loaders";
+
+const FILE_OPENED_EVENT = "file-opened";
+
+function basename(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] || path;
+}
 
 export type LayoutCtx = {
   /** Opens the OS file picker (delegates to react-dropzone). */
@@ -56,6 +75,61 @@ export function AppLayout() {
   const revalidator = useRevalidator();
   const fetcher = useFetcher<ImportActionResult>();
   const importing = fetcher.state !== "idle";
+
+  // Queue of file paths the OS handed us via file-association (double-click
+  // a .ddd, `open foo.ddd`, drop on the dock icon). The head of the queue is
+  // surfaced as a confirm dialog; user accepts → submit through the same
+  // fetcher → loader revalidation refreshes the driver list.
+  const [pendingPaths, setPendingPaths] = useState<string[]>([]);
+
+  // Drain anything the Go side buffered before this component mounted (cold
+  // launch via double-click — OnFileOpen fires before the WebView is ready).
+  useEffect(() => {
+    let cancelled = false;
+    PendingFileOpens()
+      .then((paths) => {
+        if (cancelled || !paths || paths.length === 0) return;
+        setPendingPaths((prev) => [...prev, ...paths]);
+      })
+      .catch(() => {
+        /* binding may not be reachable during teardown; ignore */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Warm-launch case: subscribe to runtime events for any file opened while
+  // the app is already running.
+  useEffect(() => {
+    const off = EventsOn(FILE_OPENED_EVENT, (...args: unknown[]) => {
+      const paths = args[0];
+      if (!Array.isArray(paths)) return;
+      const onlyStrings = paths.filter(
+        (p): p is string => typeof p === "string" && p.length > 0,
+      );
+      if (onlyStrings.length === 0) return;
+      setPendingPaths((prev) => [...prev, ...onlyStrings]);
+    });
+    return off;
+  }, []);
+
+  const currentPendingPath = pendingPaths[0] ?? null;
+
+  const dequeueCurrent = useCallback(() => {
+    setPendingPaths((prev) => prev.slice(1));
+  }, []);
+
+  const confirmPendingImport = useCallback(() => {
+    if (!currentPendingPath) return;
+    const formData = new FormData();
+    formData.append("path", currentPendingPath);
+    fetcher.submit(formData, {
+      method: "post",
+      action: "/import-from-path",
+    });
+    dequeueCurrent();
+  }, [currentPendingPath, dequeueCurrent, fetcher]);
 
   // React to completed import actions. We fire on the state transition
   // (non-idle → idle) rather than on data identity — that makes the effect's
@@ -146,6 +220,38 @@ export function AppLayout() {
             </Card>
           </div>
         )}
+
+        <AlertDialog
+          open={currentPendingPath !== null}
+          onOpenChange={(next) => {
+            if (!next) dequeueCurrent();
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Import this file?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2">
+                  <p>
+                    Tachograph Viewer was launched with a driver-card file.
+                    Import it into the database?
+                  </p>
+                  <p className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
+                    {currentPendingPath
+                      ? basename(currentPendingPath)
+                      : ""}
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmPendingImport}>
+                Import
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SidebarProvider>
     </div>
   );
