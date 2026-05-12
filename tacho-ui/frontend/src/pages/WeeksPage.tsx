@@ -13,7 +13,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 import {
   computeDailyStats,
@@ -28,7 +33,12 @@ import {
   type Infringement,
 } from "../infringements";
 import { InfringementsPanel } from "../InfringementsPanel";
-import { dowLabel, formatWeekRange, groupByWeekSunday, type WeekBucket } from "../weeks";
+import {
+  dowLabel,
+  formatWeekRange,
+  groupByWeekSunday,
+  type WeekBucket,
+} from "../weeks";
 import {
   assessWeeklyRest,
   dataWindow,
@@ -49,33 +59,37 @@ export function WeeksPage() {
   }, [data.profile]);
   useDocumentTitle(pageTitle(`Weekly summary — ${driverName}`));
 
-  const { weeks, recordsByDate, shiftsByDate, weeklyRestByWeek } = useMemo(() => {
-    const days = data.dailyRecords.map(computeDailyStats);
-    const recMap = new Map<string, DailyRecord>();
-    for (const r of data.dailyRecords) {
-      recMap.set(r.activity_record_date.slice(0, 10), r);
-    }
-    const shifts = deriveShifts(data.placeRecords);
-    const shiftMap = new Map<string, Shift>();
-    for (const s of shifts) {
-      if (!shiftMap.has(s.date)) shiftMap.set(s.date, s);
-    }
-    const groupedWeeks = groupByWeekSunday(days);
-    const restSpans = extractRestSpans(data.dailyRecords);
-    const possible = extractPossibleRestSpans(data.dailyRecords);
-    const ambiguous = extractAmbiguousSpans(data.dailyRecords);
-    const win = dataWindow(data.dailyRecords);
-    const restMap = new Map<string, WeekRestAssessment>();
-    for (const w of groupedWeeks) {
-      restMap.set(w.weekStart, assessWeeklyRest(w, restSpans, possible, ambiguous, win));
-    }
-    return {
-      weeks: groupedWeeks,
-      recordsByDate: recMap,
-      shiftsByDate: shiftMap,
-      weeklyRestByWeek: restMap,
-    };
-  }, [data]);
+  const { weeks, recordsByDate, shiftsByDate, weeklyRestByWeek } =
+    useMemo(() => {
+      const days = data.dailyRecords.map(computeDailyStats);
+      const recMap = new Map<string, DailyRecord>();
+      for (const r of data.dailyRecords) {
+        recMap.set(r.activity_record_date.slice(0, 10), r);
+      }
+      const shifts = deriveShifts(data.placeRecords);
+      const shiftMap = new Map<string, Shift>();
+      for (const s of shifts) {
+        if (!shiftMap.has(s.date)) shiftMap.set(s.date, s);
+      }
+      const groupedWeeks = groupByWeekSunday(days);
+      const restSpans = extractRestSpans(data.dailyRecords);
+      const possible = extractPossibleRestSpans(data.dailyRecords);
+      const ambiguous = extractAmbiguousSpans(data.dailyRecords);
+      const win = dataWindow(data.dailyRecords);
+      const restMap = new Map<string, WeekRestAssessment>();
+      for (const w of groupedWeeks) {
+        restMap.set(
+          w.weekStart,
+          assessWeeklyRest(w, restSpans, possible, ambiguous, win),
+        );
+      }
+      return {
+        weeks: groupedWeeks,
+        recordsByDate: recMap,
+        shiftsByDate: shiftMap,
+        weeklyRestByWeek: restMap,
+      };
+    }, [data]);
 
   const { weekInfringements, allItems } = useMemo(() => {
     const map = new Map<string, Infringement[]>();
@@ -135,10 +149,11 @@ export function WeeksPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Weekly limits are computed against the displayed Sunday–Saturday bucket. The EU regulatory
-        "fixed week" runs Monday 00:00 → Sunday 24:00 — totals near a Sun/Mon boundary may differ
-        from a strict compliance calculation. Weekly rest is detected only across periods where the
-        card was inserted; long card-not-inserted gaps may surface as "could not be confirmed".
+        Weekly limits are computed against the displayed Sunday–Saturday bucket.
+        The EU regulatory "fixed week" runs Monday 00:00 → Sunday 24:00 — totals
+        near a Sun/Mon boundary may differ from a strict compliance calculation.
+        Weekly rest is detected only across periods where the card was inserted;
+        long card-not-inserted gaps may surface as "could not be confirmed".
       </p>
     </div>
   );
@@ -176,7 +191,8 @@ function ComplianceHeadline({
         {weeks === 1 ? "" : "s"}
       </AlertTitle>
       <AlertDescription>
-        See per-week breakdowns below for the rule, date, and quantity behind each entry.
+        See per-week breakdowns below for the rule, date, and quantity behind
+        each entry.
       </AlertDescription>
     </Alert>
   );
@@ -198,11 +214,13 @@ function WeekCard({
   const hasIssues = counts.total > 0;
   const restValue = (() => {
     if (!weeklyRest) return "—";
-    if (weeklyRest.longestRest) return formatHours(weeklyRest.longestRest.durationMin);
+    if (weeklyRest.longestRest)
+      return formatHours(weeklyRest.longestRest.durationMin);
     if (weeklyRest.inconclusive) return "?";
     return "None";
   })();
-  const restWarn = !!weeklyRest && (weeklyRest.missing || weeklyRest.qualifiesReduced);
+  const restWarn =
+    !!weeklyRest && (weeklyRest.missing || weeklyRest.qualifiesReduced);
   const restTitle = weeklyRest?.longestRest
     ? `${weeklyRest.longestRest.start.replace("T", " ").slice(0, 16)} → ${weeklyRest.longestRest.end.replace("T", " ").slice(0, 16)}`
     : weeklyRest?.missing
@@ -237,14 +255,22 @@ function WeekCard({
           <WeekStat label="Driving" value={formatHours(r.totalDrivingMin)} />
           <WeekStat label="Work" value={formatHours(r.totalWorkMin)} />
           <WeekStat label="Rest" value={formatHours(r.totalRestMin)} />
-          <WeekStat label="Distance" value={`${r.totalDistanceKm.toLocaleString()} km`} />
+          <WeekStat
+            label="Distance"
+            value={`${r.totalDistanceKm.toLocaleString()} km`}
+          />
           <WeekStat label="Days driven" value={`${r.daysWithDriving}/7`} />
           <WeekStat
             label="Over 9h"
             value={String(r.daysOverLimit)}
             warn={r.daysOverLimit > 0}
           />
-          <WeekStat label="Weekly rest" value={restValue} warn={restWarn} title={restTitle} />
+          <WeekStat
+            label="Weekly rest"
+            value={restValue}
+            warn={restWarn}
+            title={restTitle}
+          />
         </div>
         <div className="grid grid-cols-7 gap-2">
           {days.map((d, i) => (
@@ -263,9 +289,15 @@ function WeekCard({
   );
 }
 
-function ComplianceChip({ counts }: { counts: ReturnType<typeof countInfringements> }) {
+function ComplianceChip({
+  counts,
+}: {
+  counts: ReturnType<typeof countInfringements>;
+}) {
   if (counts.total === 0) {
-    return <Badge className="bg-emerald-500/20 text-emerald-300">Compliant</Badge>;
+    return (
+      <Badge className="bg-emerald-500/20 text-emerald-300">Compliant</Badge>
+    );
   }
   if (counts.breach > 0) {
     return (
@@ -335,7 +367,9 @@ function DayCell({
     >
       <div className="flex items-baseline justify-between text-[0.65rem]">
         <span className="font-semibold uppercase tracking-wider">{label}</span>
-        <span className="font-mono text-muted-foreground">{day.date.slice(8)}</span>
+        <span className="font-mono text-muted-foreground">
+          {day.date.slice(8)}
+        </span>
       </div>
       <DayBars day={day} />
       <div className="flex items-baseline justify-between text-[0.7rem] tabular-nums">
@@ -348,7 +382,9 @@ function DayCell({
         >
           {formatHours(day.drivingMin)}
         </span>
-        <span className="text-muted-foreground">{day.distanceKm.toLocaleString()}km</span>
+        <span className="text-muted-foreground">
+          {day.distanceKm.toLocaleString()}km
+        </span>
       </div>
     </Link>
   );
@@ -362,7 +398,10 @@ function DayBars({ day }: { day: DailyStats }) {
       <div className="flex h-full">
         <span
           className="block"
-          style={{ width: pct(day.drivingMin), background: "var(--color-driving)" }}
+          style={{
+            width: pct(day.drivingMin),
+            background: "var(--color-driving)",
+          }}
         />
         <span
           className="block"
@@ -370,7 +409,10 @@ function DayBars({ day }: { day: DailyStats }) {
         />
         <span
           className="block"
-          style={{ width: pct(day.availableMin), background: "var(--color-available)" }}
+          style={{
+            width: pct(day.availableMin),
+            background: "var(--color-available)",
+          }}
         />
       </div>
     </div>

@@ -32,7 +32,12 @@ type Props = React.ComponentProps<typeof Sidebar> & {
   importing: boolean;
 };
 
-export function AppSidebar({ drivers, triggerImport, importing, ...props }: Props) {
+export function AppSidebar({
+  drivers,
+  triggerImport,
+  importing,
+  ...props
+}: Props) {
   const { cardNumber } = useParams<{ cardNumber?: string }>();
   const location = useLocation();
 
@@ -42,8 +47,9 @@ export function AppSidebar({ drivers, triggerImport, importing, ...props }: Prop
   }, [cardNumber, drivers]);
 
   const activeDriverName = activeDriver
-    ? [activeDriver.firstNames, activeDriver.surname].filter(Boolean).join(" ") ||
-      activeDriver.cardNumber
+    ? [activeDriver.firstNames, activeDriver.surname]
+        .filter(Boolean)
+        .join(" ") || activeDriver.cardNumber
     : null;
 
   return (
@@ -55,7 +61,9 @@ export function AppSidebar({ drivers, triggerImport, importing, ...props }: Prop
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
             <span className="truncate font-semibold">Tachograph</span>
-            <span className="truncate text-xs text-muted-foreground">Driver-card viewer</span>
+            <span className="truncate text-xs text-muted-foreground">
+              Driver-card viewer
+            </span>
           </div>
         </div>
         <div className="px-2 group-data-[collapsible=icon]:hidden">
@@ -77,7 +85,11 @@ export function AppSidebar({ drivers, triggerImport, importing, ...props }: Prop
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location.pathname === "/"} tooltip="Drivers">
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/"}
+                  tooltip="Drivers"
+                >
                   <NavLink to="/" end>
                     <Users />
                     <span>Drivers</span>
@@ -100,7 +112,10 @@ export function AppSidebar({ drivers, triggerImport, importing, ...props }: Prop
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      isActive={location.pathname === `/driver/${activeDriver.cardNumber}`}
+                      isActive={
+                        location.pathname ===
+                        `/driver/${activeDriver.cardNumber}`
+                      }
                       tooltip="Overview"
                     >
                       <NavLink to={`/driver/${activeDriver.cardNumber}`} end>
@@ -138,7 +153,8 @@ export function AppSidebar({ drivers, triggerImport, importing, ...props }: Prop
                 <SidebarMenu>
                   {drivers.map((d) => {
                     const name =
-                      [d.firstNames, d.surname].filter(Boolean).join(" ") || d.cardNumber;
+                      [d.firstNames, d.surname].filter(Boolean).join(" ") ||
+                      d.cardNumber;
                     return (
                       <SidebarMenuItem key={d.cardNumber}>
                         <SidebarMenuButton
@@ -172,8 +188,8 @@ export function AppSidebar({ drivers, triggerImport, importing, ...props }: Prop
 
       <SidebarFooter className="group-data-[collapsible=icon]:hidden">
         <p className="px-2 text-[0.65rem] leading-relaxed text-muted-foreground">
-          Drop a <code className="rounded bg-muted px-1">.ddd</code> file anywhere in the window to
-          import.
+          Drop a <code className="rounded bg-muted px-1">.ddd</code> file
+          anywhere in the window to import.
         </p>
       </SidebarFooter>
 

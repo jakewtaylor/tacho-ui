@@ -121,7 +121,11 @@ export function AppLayout() {
     <div {...getRootProps({ className: "contents" })}>
       <input {...getInputProps()} />
       <SidebarProvider>
-        <AppSidebar drivers={drivers} triggerImport={open} importing={importing} />
+        <AppSidebar
+          drivers={drivers}
+          triggerImport={open}
+          importing={importing}
+        />
         <SidebarInset>
           <Topbar drivers={drivers} loading={isLoading} />
           <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -132,8 +136,12 @@ export function AppLayout() {
         {isDragActive && (
           <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-sm">
             <Card className="px-10 py-8 text-center ring-2 ring-primary">
-              <CardTitle className="text-lg">Drop the .ddd file to import</CardTitle>
-              <CardDescription>Release to add it to the database</CardDescription>
+              <CardTitle className="text-lg">
+                Drop the .ddd file to import
+              </CardTitle>
+              <CardDescription>
+                Release to add it to the database
+              </CardDescription>
             </Card>
           </div>
         )}
@@ -157,7 +165,10 @@ function Topbar({
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 md:px-6">
       <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+      <Separator
+        orientation="vertical"
+        className="mr-2 data-[orientation=vertical]:h-4"
+      />
       <Breadcrumb>
         <BreadcrumbList>
           {crumbs.map((c, i) => {
@@ -166,7 +177,9 @@ function Topbar({
               <span key={`${c.label}-${i}`} className="contents">
                 <BreadcrumbItem>
                   {last || !c.href ? (
-                    <BreadcrumbPage className="truncate max-w-[40ch]">{c.label}</BreadcrumbPage>
+                    <BreadcrumbPage className="truncate max-w-[40ch]">
+                      {c.label}
+                    </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild>
                       <Link to={c.href}>{c.label}</Link>
@@ -196,11 +209,14 @@ function buildBreadcrumbs(
   params: { cardNumber?: string; date?: string },
   drivers: db.DriverSummary[],
 ): { label: string; href?: string }[] {
-  const out: { label: string; href?: string }[] = [{ label: "Drivers", href: "/" }];
+  const out: { label: string; href?: string }[] = [
+    { label: "Drivers", href: "/" },
+  ];
   if (!params.cardNumber) return out;
   const driver = drivers.find((d) => d.cardNumber === params.cardNumber);
   const driverName = driver
-    ? [driver.firstNames, driver.surname].filter(Boolean).join(" ") || driver.cardNumber
+    ? [driver.firstNames, driver.surname].filter(Boolean).join(" ") ||
+      driver.cardNumber
     : params.cardNumber;
 
   const driverHref = `/driver/${params.cardNumber}`;

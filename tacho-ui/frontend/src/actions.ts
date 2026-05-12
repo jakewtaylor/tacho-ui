@@ -24,7 +24,10 @@ export async function importAction({
   try {
     formData = await request.formData();
   } catch (e: unknown) {
-    return { ok: false, message: `Bad form data: ${String((e as Error)?.message ?? e)}` };
+    return {
+      ok: false,
+      message: `Bad form data: ${String((e as Error)?.message ?? e)}`,
+    };
   }
 
   const file = formData.get("file");

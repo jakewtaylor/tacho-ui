@@ -90,7 +90,9 @@ export function InfringementsPanel({
               {counts.warning} warning{counts.warning === 1 ? "" : "s"}
             </Badge>
           )}
-          {counts.info > 0 && <Badge variant="secondary">{counts.info} info</Badge>}
+          {counts.info > 0 && (
+            <Badge variant="secondary">{counts.info} info</Badge>
+          )}
         </div>
       </div>
       <Card size="sm">

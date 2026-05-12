@@ -60,7 +60,9 @@ export function Home() {
       revalidator.revalidate();
       toast.success("Database wiped");
     } catch (e: unknown) {
-      toast.error("Wipe failed", { description: String((e as Error)?.message ?? e) });
+      toast.error("Wipe failed", {
+        description: String((e as Error)?.message ?? e),
+      });
     } finally {
       setWiping(false);
     }
@@ -75,7 +77,8 @@ export function Home() {
           </EmptyMedia>
           <EmptyTitle>No drivers yet</EmptyTitle>
           <EmptyDescription>
-            Import a driver-card <code className="rounded bg-muted px-1">.ddd</code> file to get
+            Import a driver-card{" "}
+            <code className="rounded bg-muted px-1">.ddd</code> file to get
             started. Drag-and-drop also works.
           </EmptyDescription>
         </EmptyHeader>
@@ -100,7 +103,8 @@ export function Home() {
           {drivers.length} driver{drivers.length === 1 ? "" : "s"}
         </CardTitle>
         <CardDescription>
-          Click a driver to view their activity, weekly summary, and infringements.
+          Click a driver to view their activity, weekly summary, and
+          infringements.
         </CardDescription>
         <CardAction>
           <AlertDialog>
@@ -156,7 +160,9 @@ export function Home() {
           </TableHeader>
           <TableBody>
             {drivers.map((d) => {
-              const name = [d.firstNames, d.surname].filter(Boolean).join(" ") || "(unknown)";
+              const name =
+                [d.firstNames, d.surname].filter(Boolean).join(" ") ||
+                "(unknown)";
               return (
                 <TableRow
                   key={d.cardNumber}
@@ -171,7 +177,9 @@ export function Home() {
                       </div>
                     ) : null}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{d.cardNumber}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {d.cardNumber}
+                  </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {d.firstDate && d.lastDate
                       ? `${d.firstDate} → ${d.lastDate}`

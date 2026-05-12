@@ -1,5 +1,11 @@
 import { useMemo } from "react";
-import { Link, Navigate, useLocation, useParams, useRouteLoaderData } from "react-router-dom";
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useParams,
+  useRouteLoaderData,
+} from "react-router-dom";
 import { ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -10,7 +16,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { DayDetail } from "../DayDetail";
 import { MapPanel } from "../MapPanel";
 import {
@@ -38,7 +49,10 @@ function formatHeading(date: string): string {
 }
 
 export function DayPage() {
-  const { cardNumber, date } = useParams<{ cardNumber: string; date: string }>();
+  const { cardNumber, date } = useParams<{
+    cardNumber: string;
+    date: string;
+  }>();
   const navState = useLocation().state as { from?: string } | null;
   const data = useRouteLoaderData("driver") as DriverLoaderData;
 
@@ -85,7 +99,8 @@ export function DayPage() {
   const nextDate = idx < sortedDates.length - 1 ? sortedDates[idx + 1] : null;
   const stats: DailyStats = computeDailyStats(record);
   const detail = computeDayDetail(record);
-  const shift = deriveShifts(data.placeRecords).find((s) => s.date === date) ?? null;
+  const shift =
+    deriveShifts(data.placeRecords).find((s) => s.date === date) ?? null;
   const infringements = detectDayInfringements({ stats, detail, shift });
 
   return (
@@ -99,7 +114,9 @@ export function DayPage() {
               state={navState}
             />
             <div className="flex flex-col items-center text-center">
-              <CardDescription className="font-mono tabular-nums">{date}</CardDescription>
+              <CardDescription className="font-mono tabular-nums">
+                {date}
+              </CardDescription>
               <CardTitle className="text-xl">{formatHeading(date)}</CardTitle>
               <CardDescription>
                 Day {idx + 1} of {sortedDates.length}
@@ -121,7 +138,10 @@ export function DayPage() {
             />
             <DayChip label="Work" value={formatHours(stats.workMin)} />
             <DayChip label="Rest" value={formatHours(stats.restMin)} />
-            <DayChip label="Distance" value={`${stats.distanceKm.toLocaleString()} km`} />
+            <DayChip
+              label="Distance"
+              value={`${stats.distanceKm.toLocaleString()} km`}
+            />
           </div>
         </CardContent>
       </Card>
@@ -130,7 +150,11 @@ export function DayPage() {
 
       <DayDetail record={record} />
 
-      <MapPanel points={data.gnssPoints} dateFilter={date} title={`Driving map · ${date}`} />
+      <MapPanel
+        points={data.gnssPoints}
+        dateFilter={date}
+        title={`Driving map · ${date}`}
+      />
     </div>
   );
 }
@@ -166,11 +190,21 @@ function NavButton({
   );
 }
 
-function DayChip({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+function DayChip({
+  label,
+  value,
+  warn,
+}: {
+  label: string;
+  value: string;
+  warn?: boolean;
+}) {
   return (
     <Card size="sm">
       <CardHeader>
-        <CardDescription className="uppercase tracking-wider">{label}</CardDescription>
+        <CardDescription className="uppercase tracking-wider">
+          {label}
+        </CardDescription>
         <CardTitle
           className={
             "font-heading text-xl tabular-nums " +

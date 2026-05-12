@@ -6,7 +6,10 @@ export type GnssPoint = {
 };
 
 // Bounding box across all points, with a configurable padding factor.
-export function boundsOf(points: GnssPoint[], padding = 0.5): {
+export function boundsOf(
+  points: GnssPoint[],
+  padding = 0.5,
+): {
   minLon: number;
   maxLon: number;
   minLat: number;

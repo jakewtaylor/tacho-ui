@@ -13,7 +13,7 @@ export type VehicleUsage = {
 export function vehicleForShift(
   vehicles: VehicleUsage[],
   shiftStart: string,
-  shiftEnd: string | null
+  shiftEnd: string | null,
 ): VehicleUsage | null {
   if (!shiftEnd) return null;
   const start = new Date(shiftStart).getTime();

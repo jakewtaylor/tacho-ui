@@ -45,20 +45,31 @@ export type Summary = {
   value: string;
 };
 
-export function driverSummaryFromProfile(profile: db.DriverProfile | null): Summary[] {
+export function driverSummaryFromProfile(
+  profile: db.DriverProfile | null,
+): Summary[] {
   if (!profile) return [];
   const out: Summary[] = [];
   const name = [profile.firstNames, profile.surname].filter(Boolean).join(" ");
   if (name) out.push({ label: "Driver", value: name });
   out.push({ label: "Card number", value: profile.cardNumber });
   if (profile.issuingState) {
-    out.push({ label: "Issuing member state", value: nationName(profile.issuingState) });
+    out.push({
+      label: "Issuing member state",
+      value: nationName(profile.issuingState),
+    });
   }
-  if (profile.cardIssueDate) out.push({ label: "Issued", value: profile.cardIssueDate });
-  if (profile.cardExpiryDate) out.push({ label: "Expires", value: profile.cardExpiryDate });
-  if (profile.birthDate) out.push({ label: "Date of birth", value: profile.birthDate });
+  if (profile.cardIssueDate)
+    out.push({ label: "Issued", value: profile.cardIssueDate });
+  if (profile.cardExpiryDate)
+    out.push({ label: "Expires", value: profile.cardExpiryDate });
+  if (profile.birthDate)
+    out.push({ label: "Date of birth", value: profile.birthDate });
   if (profile.firstDate && profile.lastDate) {
-    out.push({ label: "Data range", value: `${profile.firstDate} → ${profile.lastDate}` });
+    out.push({
+      label: "Data range",
+      value: `${profile.firstDate} → ${profile.lastDate}`,
+    });
   }
   out.push({
     label: "Imports",
@@ -92,15 +103,29 @@ export function DriverSummaryPanel({ summary }: { summary: Summary[] }) {
   );
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <Card size="sm">
       <CardHeader>
-        <CardDescription className="uppercase tracking-wider">{label}</CardDescription>
-        <CardTitle className="font-heading text-2xl tabular-nums">{value}</CardTitle>
+        <CardDescription className="uppercase tracking-wider">
+          {label}
+        </CardDescription>
+        <CardTitle className="font-heading text-2xl tabular-nums">
+          {value}
+        </CardTitle>
       </CardHeader>
       {hint && (
-        <CardFooter className="pt-0 text-xs text-muted-foreground">{hint}</CardFooter>
+        <CardFooter className="pt-0 text-xs text-muted-foreground">
+          {hint}
+        </CardFooter>
       )}
     </Card>
   );
@@ -114,7 +139,10 @@ function MiniBar({ day }: { day: DailyStats }) {
       <div className="flex h-full">
         <span
           className="block"
-          style={{ width: pct(day.drivingMin), background: "var(--color-driving)" }}
+          style={{
+            width: pct(day.drivingMin),
+            background: "var(--color-driving)",
+          }}
         />
         <span
           className="block"
@@ -122,7 +150,10 @@ function MiniBar({ day }: { day: DailyStats }) {
         />
         <span
           className="block"
-          style={{ width: pct(day.availableMin), background: "var(--color-available)" }}
+          style={{
+            width: pct(day.availableMin),
+            background: "var(--color-available)",
+          }}
         />
       </div>
     </div>
@@ -212,7 +243,8 @@ export function ActivityPanel({
         <CardHeader className="border-b">
           <CardTitle>Daily activity · last 28 days</CardTitle>
           <CardDescription>
-            Periods with the card inserted only. Dashed line marks the EU 9h daily limit.
+            Periods with the card inserted only. Dashed line marks the EU 9h
+            daily limit.
           </CardDescription>
           <CardAction>
             <Legend />
@@ -241,9 +273,13 @@ export function ActivityPanel({
                 <TableRow
                   key={day.date}
                   className="cursor-pointer"
-                  onClick={() => navigate(`/driver/${cardNumber}/day/${day.date}`)}
+                  onClick={() =>
+                    navigate(`/driver/${cardNumber}/day/${day.date}`)
+                  }
                 >
-                  <TableCell className="pl-4 font-mono text-xs">{day.date}</TableCell>
+                  <TableCell className="pl-4 font-mono text-xs">
+                    {day.date}
+                  </TableCell>
                   <TableCell>
                     <MiniBar day={day} />
                   </TableCell>
@@ -278,7 +314,8 @@ export function ActivityPanel({
           </Table>
         </CardContent>
         <CardFooter className="text-xs text-muted-foreground">
-          Click a day for a 24-hour timeline, GNSS map, and break-compliance breakdown.
+          Click a day for a 24-hour timeline, GNSS map, and break-compliance
+          breakdown.
         </CardFooter>
       </Card>
     </section>
@@ -307,8 +344,9 @@ export function ShiftsPanel({
       <CardHeader className="border-b">
         <CardTitle>Recent shifts</CardTitle>
         <CardDescription>
-          Rest before is the gap between the previous shift’s end and this shift’s start.
-          A warning marks gaps under the EU 11h daily-rest threshold.
+          Rest before is the gap between the previous shift’s end and this
+          shift’s start. A warning marks gaps under the EU 11h daily-rest
+          threshold.
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0">
@@ -330,9 +368,13 @@ export function ShiftsPanel({
                 <TableRow
                   key={i}
                   className="cursor-pointer"
-                  onClick={() => navigate(`/driver/${cardNumber}/day/${s.date}`)}
+                  onClick={() =>
+                    navigate(`/driver/${cardNumber}/day/${s.date}`)
+                  }
                 >
-                  <TableCell className="pl-4 font-mono text-xs">{s.date}</TableCell>
+                  <TableCell className="pl-4 font-mono text-xs">
+                    {s.date}
+                  </TableCell>
                   <TableCell className="font-mono text-xs">
                     {vehicle ? (
                       vehicle.registration
@@ -369,7 +411,9 @@ export function ShiftsPanel({
                     }
                   >
                     <span className="inline-flex items-center gap-1">
-                      {s.restBeforeMin != null ? formatHours(s.restBeforeMin) : "—"}
+                      {s.restBeforeMin != null
+                        ? formatHours(s.restBeforeMin)
+                        : "—"}
                       {s.shortRest && <TriangleAlert className="size-3" />}
                     </span>
                   </TableCell>

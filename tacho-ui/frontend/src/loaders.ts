@@ -38,17 +38,20 @@ export async function driverLoader({
     throw new Response("Missing card number", { status: 400 });
   }
 
-  const [profile, dailyRecords, placeRecords, gnssPoints, events, vehicles] = await Promise.all([
-    GetDriverProfile(cardNumber),
-    GetDailyRecords(cardNumber),
-    GetPlaceRecords(cardNumber),
-    GetGnssPoints(cardNumber),
-    GetEventsAndFaults(cardNumber),
-    GetDriverVehicles(cardNumber),
-  ]);
+  const [profile, dailyRecords, placeRecords, gnssPoints, events, vehicles] =
+    await Promise.all([
+      GetDriverProfile(cardNumber),
+      GetDailyRecords(cardNumber),
+      GetPlaceRecords(cardNumber),
+      GetGnssPoints(cardNumber),
+      GetEventsAndFaults(cardNumber),
+      GetDriverVehicles(cardNumber),
+    ]);
 
   if (!profile) {
-    throw new Response(`No driver found for card ${cardNumber}.`, { status: 404 });
+    throw new Response(`No driver found for card ${cardNumber}.`, {
+      status: 404,
+    });
   }
 
   return {

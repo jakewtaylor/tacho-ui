@@ -14,7 +14,10 @@ import type { DriverLoaderData } from "../loaders";
 
 export function Overview() {
   const data = useRouteLoaderData("driver") as DriverLoaderData;
-  const summary = useMemo(() => driverSummaryFromProfile(data.profile), [data.profile]);
+  const summary = useMemo(
+    () => driverSummaryFromProfile(data.profile),
+    [data.profile],
+  );
   const driverName = useMemo(() => {
     const p = data.profile;
     return [p.firstNames, p.surname].filter(Boolean).join(" ") || p.cardNumber;

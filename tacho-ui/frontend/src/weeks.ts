@@ -1,8 +1,8 @@
-import { rollup, type ActivityRollup, type DailyStats } from './activity';
+import { rollup, type ActivityRollup, type DailyStats } from "./activity";
 
 export type WeekBucket = {
   weekStart: string; // Sunday, yyyy-mm-dd (UTC)
-  weekEnd: string;   // Saturday, yyyy-mm-dd (UTC)
+  weekEnd: string; // Saturday, yyyy-mm-dd (UTC)
   // 7 slots, index 0 = Sunday … 6 = Saturday. null = no record for that day.
   days: (DailyStats | null)[];
   rollup: ActivityRollup;
@@ -60,9 +60,9 @@ export function groupByWeekSunday(days: DailyStats[]): WeekBucket[] {
   return out;
 }
 
-const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export function dowLabel(i: number): string {
-  return DOW_LABELS[i] ?? '';
+  return DOW_LABELS[i] ?? "";
 }
 
 /** "May 10 – May 16, 2026" or "Dec 28, 2025 – Jan 3, 2026" if it crosses a year. */
@@ -71,16 +71,16 @@ export function formatWeekRange(weekStart: string, weekEnd: string): string {
   const b = toUTCDate(weekEnd);
   const sameYear = a.getUTCFullYear() === b.getUTCFullYear();
   const left = a.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: sameYear ? undefined : 'numeric',
-    timeZone: 'UTC',
+    month: "short",
+    day: "numeric",
+    year: sameYear ? undefined : "numeric",
+    timeZone: "UTC",
   });
   const right = b.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
   });
   return `${left} – ${right}`;
 }

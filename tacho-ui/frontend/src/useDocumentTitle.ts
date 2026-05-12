@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
-const BASE_TITLE = 'Tachograph Viewer';
+const BASE_TITLE = "Tachograph Viewer";
 
 /**
  * Sets `document.title` for the lifetime of the calling component and restores

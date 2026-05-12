@@ -8,7 +8,10 @@ export type CardEvent = {
   vehicleNation: number;
 };
 
-export function durationMinutes(begin: string, end: string | null): number | null {
+export function durationMinutes(
+  begin: string,
+  end: string | null,
+): number | null {
   if (!end) return null;
   const a = new Date(begin).getTime();
   const b = new Date(end).getTime();

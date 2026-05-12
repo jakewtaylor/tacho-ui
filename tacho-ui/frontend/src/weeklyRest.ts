@@ -30,8 +30,8 @@
 //   requires a reduced weekly rest to be compensated as one block by the end
 //   of the third following week. That's a separate cross-week bookkeeping pass.
 
-import type { DailyRecord } from './activity';
-import type { WeekBucket } from './weeks';
+import type { DailyRecord } from "./activity";
+import type { WeekBucket } from "./weeks";
 
 const MS_PER_MIN = 60_000;
 const MIN_PER_DAY = 1440;
@@ -45,7 +45,7 @@ export const WeeklyRestThresholds = {
 
 export type RestSpan = {
   start: string; // ISO datetime UTC
-  end: string;   // ISO datetime UTC
+  end: string; // ISO datetime UTC
   startMs: number;
   endMs: number;
   durationMin: number;
@@ -61,7 +61,7 @@ export function extractRestSpans(records: DailyRecord[]): RestSpan[] {
   type Seg = { startMs: number; endMs: number; isRest: boolean };
 
   const sorted = [...records].sort((a, b) =>
-    a.activity_record_date.localeCompare(b.activity_record_date)
+    a.activity_record_date.localeCompare(b.activity_record_date),
   );
 
   const segs: Seg[] = [];
@@ -70,10 +70,13 @@ export function extractRestSpans(records: DailyRecord[]): RestSpan[] {
     const dayBaseMs = Date.parse(`${dateStr}T00:00:00Z`);
     if (Number.isNaN(dayBaseMs)) continue;
 
-    const events = [...rec.activity_change_info].sort((a, b) => a.minutes - b.minutes);
+    const events = [...rec.activity_change_info].sort(
+      (a, b) => a.minutes - b.minutes,
+    );
     for (let i = 0; i < events.length; i++) {
       const cur = events[i];
-      const nextMin = i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
+      const nextMin =
+        i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
       const dur = nextMin - cur.minutes;
       if (dur <= 0) continue;
       const isRest = cur.card_present === true && cur.work_type === 0;
@@ -111,7 +114,7 @@ export function extractPossibleRestSpans(records: DailyRecord[]): RestSpan[] {
   type Seg = { startMs: number; endMs: number; possibleRest: boolean };
 
   const sorted = [...records].sort((a, b) =>
-    a.activity_record_date.localeCompare(b.activity_record_date)
+    a.activity_record_date.localeCompare(b.activity_record_date),
   );
 
   const segs: Seg[] = [];
@@ -119,16 +122,20 @@ export function extractPossibleRestSpans(records: DailyRecord[]): RestSpan[] {
     const dateStr = rec.activity_record_date.slice(0, 10);
     const dayBaseMs = Date.parse(`${dateStr}T00:00:00Z`);
     if (Number.isNaN(dayBaseMs)) continue;
-    const events = [...rec.activity_change_info].sort((a, b) => a.minutes - b.minutes);
+    const events = [...rec.activity_change_info].sort(
+      (a, b) => a.minutes - b.minutes,
+    );
     for (let i = 0; i < events.length; i++) {
       const cur = events[i];
-      const nextMin = i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
+      const nextMin =
+        i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
       const dur = nextMin - cur.minutes;
       if (dur <= 0) continue;
       // "possible rest" = verified rest OR card-not-inserted (unknown).
       // Anything else (driving, work, availability) breaks the chain.
       const possible =
-        (cur.card_present === true && cur.work_type === 0) || cur.card_present === false;
+        (cur.card_present === true && cur.work_type === 0) ||
+        cur.card_present === false;
       const startMs = dayBaseMs + cur.minutes * MS_PER_MIN;
       const endMs = dayBaseMs + nextMin * MS_PER_MIN;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
@@ -155,7 +162,7 @@ export function extractAmbiguousSpans(records: DailyRecord[]): RestSpan[] {
   type Seg = { startMs: number; endMs: number; isAmbig: boolean };
 
   const sorted = [...records].sort((a, b) =>
-    a.activity_record_date.localeCompare(b.activity_record_date)
+    a.activity_record_date.localeCompare(b.activity_record_date),
   );
 
   const segs: Seg[] = [];
@@ -163,10 +170,13 @@ export function extractAmbiguousSpans(records: DailyRecord[]): RestSpan[] {
     const dateStr = rec.activity_record_date.slice(0, 10);
     const dayBaseMs = Date.parse(`${dateStr}T00:00:00Z`);
     if (Number.isNaN(dayBaseMs)) continue;
-    const events = [...rec.activity_change_info].sort((a, b) => a.minutes - b.minutes);
+    const events = [...rec.activity_change_info].sort(
+      (a, b) => a.minutes - b.minutes,
+    );
     for (let i = 0; i < events.length; i++) {
       const cur = events[i];
-      const nextMin = i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
+      const nextMin =
+        i + 1 < events.length ? events[i + 1].minutes : MIN_PER_DAY;
       const dur = nextMin - cur.minutes;
       if (dur <= 0) continue;
       const isAmbig = cur.card_present === false;
@@ -231,7 +241,12 @@ export type WeekRestAssessment = {
   inconclusive: boolean;
 };
 
-function overlapMin(aStart: number, aEnd: number, bStart: number, bEnd: number): number {
+function overlapMin(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number,
+): number {
   const s = Math.max(aStart, bStart);
   const e = Math.min(aEnd, bEnd);
   if (e <= s) return 0;
@@ -243,10 +258,11 @@ export function assessWeeklyRest(
   restSpans: RestSpan[],
   possibleRestSpans: RestSpan[],
   ambiguousSpans: RestSpan[],
-  window: DataWindow | null
+  window: DataWindow | null,
 ): WeekRestAssessment {
   const weekStartMs = Date.parse(`${week.weekStart}T00:00:00Z`);
-  const weekEndExclusiveMs = Date.parse(`${week.weekEnd}T00:00:00Z`) + MIN_PER_DAY * MS_PER_MIN;
+  const weekEndExclusiveMs =
+    Date.parse(`${week.weekEnd}T00:00:00Z`) + MIN_PER_DAY * MS_PER_MIN;
 
   let best: RestSpan | null = null;
   for (const span of restSpans) {
@@ -261,12 +277,18 @@ export function assessWeeklyRest(
     if (span.durationMin < REDUCED_WEEKLY_REST_MIN) continue;
     if (span.endMs <= weekStartMs) continue;
     if (span.startMs >= weekEndExclusiveMs) continue;
-    if (!bestPossible || span.durationMin > bestPossible.durationMin) bestPossible = span;
+    if (!bestPossible || span.durationMin > bestPossible.durationMin)
+      bestPossible = span;
   }
 
   let ambiguousMin = 0;
   for (const span of ambiguousSpans) {
-    ambiguousMin += overlapMin(span.startMs, span.endMs, weekStartMs, weekEndExclusiveMs);
+    ambiguousMin += overlapMin(
+      span.startMs,
+      span.endMs,
+      weekStartMs,
+      weekEndExclusiveMs,
+    );
   }
 
   const incompleteOnEdge = window

@@ -40,7 +40,9 @@ const DAILY_DRIVING_HARD_LIMIT_MIN = 10 * 60;
 
 export function computeDailyStats(record: DailyRecord): DailyStats {
   const date = record.activity_record_date.slice(0, 10);
-  const events = [...record.activity_change_info].sort((a, b) => a.minutes - b.minutes);
+  const events = [...record.activity_change_info].sort(
+    (a, b) => a.minutes - b.minutes,
+  );
 
   let drivingMin = 0;
   let workMin = 0;
@@ -50,7 +52,8 @@ export function computeDailyStats(record: DailyRecord): DailyStats {
 
   for (let i = 0; i < events.length; i++) {
     const cur = events[i];
-    const nextMin = i + 1 < events.length ? events[i + 1].minutes : MINUTES_IN_DAY;
+    const nextMin =
+      i + 1 < events.length ? events[i + 1].minutes : MINUTES_IN_DAY;
     const duration = Math.max(0, nextMin - cur.minutes);
 
     if (!cur.card_present) {
@@ -119,7 +122,7 @@ export function rollup(stats: DailyStats[]): ActivityRollup {
 }
 
 export function formatHours(minutes: number): string {
-  if (minutes <= 0) return '0h';
+  if (minutes <= 0) return "0h";
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m}m`;
@@ -127,12 +130,11 @@ export function formatHours(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-
 export function formatClock(minutes: number): string {
   const m = Math.max(0, Math.min(MINUTES_IN_DAY, Math.round(minutes)));
   const h = Math.floor(m / 60);
   const mm = m % 60;
-  return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
 // EU 561/2006 Art. 7 break thresholds.
@@ -180,13 +182,16 @@ export type DayDetail = {
 
 export function computeDayDetail(record: DailyRecord): DayDetail {
   const date = record.activity_record_date.slice(0, 10);
-  const events = [...record.activity_change_info].sort((a, b) => a.minutes - b.minutes);
+  const events = [...record.activity_change_info].sort(
+    (a, b) => a.minutes - b.minutes,
+  );
 
   // Build segments first.
   const segments: ActivitySegment[] = [];
   for (let i = 0; i < events.length; i++) {
     const cur = events[i];
-    const nextMin = i + 1 < events.length ? events[i + 1].minutes : MINUTES_IN_DAY;
+    const nextMin =
+      i + 1 < events.length ? events[i + 1].minutes : MINUTES_IN_DAY;
     const duration = Math.max(0, nextMin - cur.minutes);
     if (duration === 0) continue;
     segments.push({

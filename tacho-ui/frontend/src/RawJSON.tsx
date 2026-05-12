@@ -15,7 +15,11 @@ export function RawJSON({ json }: { json: string }) {
         onClick={() => setShow((v) => !v)}
         className="self-start"
       >
-        {show ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}
+        {show ? (
+          <ChevronDown data-icon="inline-start" />
+        ) : (
+          <ChevronRight data-icon="inline-start" />
+        )}
         {show ? "Hide" : "Show"} raw JSON ({json.length.toLocaleString()} bytes)
       </Button>
       {show && (

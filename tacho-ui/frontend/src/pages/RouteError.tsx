@@ -11,7 +11,8 @@ export function RouteError() {
 
   if (isRouteErrorResponse(error)) {
     title = `${error.status} ${error.statusText}`;
-    body = typeof error.data === "string" ? error.data : JSON.stringify(error.data);
+    body =
+      typeof error.data === "string" ? error.data : JSON.stringify(error.data);
   } else if (error instanceof Error) {
     body = error.message;
   } else {

@@ -2,12 +2,7 @@ import { useMemo } from "react";
 import { TriangleAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -72,7 +67,9 @@ function Timeline({ segments }: { segments: ActivitySegment[] }) {
             y={0}
             width={Math.max(1, seg.endMin - seg.startMin)}
             height={36}
-            fill={seg.cardPresent ? SEGMENT_COLORS[seg.workType] : NO_CARD_COLOR}
+            fill={
+              seg.cardPresent ? SEGMENT_COLORS[seg.workType] : NO_CARD_COLOR
+            }
           >
             <title>
               {formatClock(seg.startMin)}–{formatClock(seg.endMin)} ·{" "}
@@ -129,7 +126,9 @@ function DrivingSessions({ sessions }: { sessions: DrivingSession[] }) {
               <TableCell className="text-right tabular-nums">
                 {s.followingBreakMin > 0 ? (
                   isSplit ? (
-                    <span title={`${s.firstBreakMin}m + ${s.secondBreakMin}m split`}>
+                    <span
+                      title={`${s.firstBreakMin}m + ${s.secondBreakMin}m split`}
+                    >
                       {s.firstBreakMin}+{s.secondBreakMin}m
                     </span>
                   ) : (
@@ -146,9 +145,13 @@ function DrivingSessions({ sessions }: { sessions: DrivingSession[] }) {
                     Over 4h 30m driving before a qualifying break
                   </span>
                 ) : isSplit ? (
-                  <span className="text-muted-foreground">OK (split break)</span>
+                  <span className="text-muted-foreground">
+                    OK (split break)
+                  </span>
                 ) : s.drivingMin >= Thresholds.CONTINUOUS_DRIVING_MAX_MIN ? (
-                  <span className="text-muted-foreground">At limit, break observed</span>
+                  <span className="text-muted-foreground">
+                    At limit, break observed
+                  </span>
                 ) : (
                   <span className="text-muted-foreground">OK</span>
                 )}
@@ -212,7 +215,9 @@ export function DayDetail({ record }: Props) {
       <CardHeader className="border-b">
         <CardTitle className="flex items-center gap-2">
           Detail · {detail.date}
-          {detail.hasBreakBreach && <Badge variant="destructive">Break breach</Badge>}
+          {detail.hasBreakBreach && (
+            <Badge variant="destructive">Break breach</Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

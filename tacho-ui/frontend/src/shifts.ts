@@ -40,7 +40,7 @@ const END_TYPES = new Set([1, 3]);
 export function deriveShifts(records: PlaceRecord[]): Shift[] {
   // Sort ascending by entry_time, but ignore zero / placeholder entries.
   const sorted = records
-    .filter((r) => r && r.entry_time && !r.entry_time.startsWith('0001'))
+    .filter((r) => r && r.entry_time && !r.entry_time.startsWith("0001"))
     .slice()
     .sort((a, b) => a.entry_time.localeCompare(b.entry_time));
 
@@ -68,7 +68,8 @@ export function deriveShifts(records: PlaceRecord[]): Shift[] {
       openBegin = r;
     } else if (END_TYPES.has(t)) {
       if (openBegin) {
-        const dist = r.vehicle_odometer_value - openBegin.vehicle_odometer_value;
+        const dist =
+          r.vehicle_odometer_value - openBegin.vehicle_odometer_value;
         shifts.push({
           date: openBegin.entry_time.slice(0, 10),
           startTime: openBegin.entry_time,
@@ -121,7 +122,7 @@ export function deriveShifts(records: PlaceRecord[]): Shift[] {
 export function formatTimeOfDay(isoTime: string): string {
   const d = new Date(isoTime);
   if (Number.isNaN(d.getTime())) return isoTime;
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }

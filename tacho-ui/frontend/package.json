@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"hooks/**/*.ts\" \"lib/**/*.ts\" \"*.{json,html,ts}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"hooks/**/*.ts\" \"lib/**/*.ts\" \"*.{json,html,ts}\""
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.2.8",
@@ -43,6 +45,7 @@
     "@types/react-dom": "^18.0.6",
     "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^6.0.1",
+    "prettier": "^3.8.3",
     "tailwindcss": "^4.3.0",
     "typescript": "^4.6.4",
     "vite": "^8.0.12"
