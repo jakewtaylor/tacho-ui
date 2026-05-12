@@ -1,36 +1,56 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { createHashRouter, RouterProvider } from "react-router-dom";
+
 import "./style.css";
-import App from "./App";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppLayout } from "./layouts/app-layout";
+import { driverLoader, layoutLoader } from "./loaders";
+import { DayPage } from "./pages/DayPage";
 import { Home } from "./pages/Home";
 import { Overview } from "./pages/Overview";
-import { DayPage } from "./pages/DayPage";
-import { WeeksPage } from "./pages/WeeksPage";
 import { PrintWeekPage } from "./pages/PrintWeekPage";
-import { AppLayout } from "./layouts/app-layout";
+import { RouteError } from "./pages/RouteError";
+import { WeeksPage } from "./pages/WeeksPage";
+
+const router = createHashRouter([
+  {
+    id: "layout",
+    element: <AppLayout />,
+    loader: layoutLoader,
+    errorElement: <RouteError />,
+    children: [
+      { index: true, element: <Home /> },
+      {
+        path: "driver/:cardNumber",
+        id: "driver",
+        loader: driverLoader,
+        children: [
+          { index: true, element: <Overview /> },
+          { path: "weeks", element: <WeeksPage /> },
+          { path: "day/:date", element: <DayPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    path: "driver/:cardNumber/print/week/:weekStart",
+    id: "print-driver",
+    loader: driverLoader,
+    element: <PrintWeekPage />,
+    errorElement: <RouteError />,
+  },
+]);
 
 const container = document.getElementById("root");
 const root = createRoot(container!);
 
 root.render(
   <React.StrictMode>
-    <HashRouter>
-      <Routes>
-        <Route element={<App />}>
-          <Route element={<AppLayout />}>
-            <Route index element={<Home />} />
-            <Route path="driver/:cardNumber" element={<Overview />} />
-            <Route path="driver/:cardNumber/weeks" element={<WeeksPage />} />
-            <Route path="driver/:cardNumber/day/:date" element={<DayPage />} />
-          </Route>
-
-          <Route
-            path="driver/:cardNumber/print/week/:weekStart"
-            element={<PrintWeekPage />}
-          />
-        </Route>
-      </Routes>
-    </HashRouter>
+    <TooltipProvider>
+      <RouterProvider router={router} />
+      <Toaster position="bottom-right" />
+    </TooltipProvider>
   </React.StrictMode>,
 );

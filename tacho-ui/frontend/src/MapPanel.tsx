@@ -7,7 +7,14 @@ import {
 } from "@vis.gl/react-google-maps";
 import { MapPin } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Empty,
   EmptyDescription,
@@ -44,7 +51,8 @@ export function MapPanel({ points: allPoints, dateFilter, title }: Props) {
       const prev = points[i - 1];
       const cur = points[i];
       const gapH =
-        (new Date(cur.timestamp).getTime() - new Date(prev.timestamp).getTime()) /
+        (new Date(cur.timestamp).getTime() -
+          new Date(prev.timestamp).getTime()) /
         3_600_000;
       if (gapH > 12) {
         if (current.length > 0) out.push(current);
@@ -79,9 +87,16 @@ export function MapPanel({ points: allPoints, dateFilter, title }: Props) {
               </EmptyMedia>
               <EmptyTitle>Google Maps API key not configured</EmptyTitle>
               <EmptyDescription>
-                Create <code className="rounded bg-muted px-1">frontend/.env.local</code> with{" "}
-                <code className="rounded bg-muted px-1">VITE_GOOGLE_MAPS_API_KEY</code>, enable the{" "}
-                "Maps JavaScript API" on the key, then restart <code>wails dev</code>.
+                Create{" "}
+                <code className="rounded bg-muted px-1">
+                  frontend/.env.local
+                </code>{" "}
+                with{" "}
+                <code className="rounded bg-muted px-1">
+                  VITE_GOOGLE_MAPS_API_KEY
+                </code>
+                , enable the "Maps JavaScript API" on the key, then restart{" "}
+                <code>wails dev</code>.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -95,7 +110,9 @@ export function MapPanel({ points: allPoints, dateFilter, title }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>{headerText}</CardTitle>
-          <CardDescription>No GNSS samples recorded for this day.</CardDescription>
+          <CardDescription>
+            No GNSS samples recorded for this day.
+          </CardDescription>
         </CardHeader>
       </Card>
     );
@@ -112,7 +129,7 @@ export function MapPanel({ points: allPoints, dateFilter, title }: Props) {
             mapId={MAP_ID}
             defaultCenter={{ lat: 51.5, lng: 0 }}
             defaultZoom={5}
-            gestureHandling="greedy"
+            gestureHandling="cooperative"
             disableDefaultUI={false}
             colorScheme="DARK"
             clickableIcons={false}
@@ -141,8 +158,8 @@ export function MapPanel({ points: allPoints, dateFilter, title }: Props) {
         </APIProvider>
       </div>
       <CardFooter className="text-xs text-muted-foreground">
-        {points.length.toLocaleString()} GNSS samples. Lines connect consecutive samples within the same
-        continuous driving window (gap &lt; 12h).
+        {points.length.toLocaleString()} GNSS samples. Lines connect consecutive
+        samples within the same continuous driving window (gap &lt; 12h).
       </CardFooter>
     </Card>
   );

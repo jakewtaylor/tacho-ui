@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, useRevalidator } from "react-router-dom";
 import { Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,52 +40,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ListDrivers, WipeDatabase } from "../../wailsjs/go/main/App";
-import type { db } from "../../wailsjs/go/models";
+import { WipeDatabase } from "../../wailsjs/go/main/App";
+import { useLayoutCtx, useLayoutData } from "../layouts/app-layout";
 import { nationName } from "../nations";
 import { pageTitle, useDocumentTitle } from "../useDocumentTitle";
-import { useLayoutCtx } from "../layouts/app-layout";
 
 export function Home() {
   const navigate = useNavigate();
-  const { importTick, openFilePicker, drivers: cached, reloadDrivers } = useLayoutCtx();
-  const [drivers, setDrivers] = useState<db.DriverSummary[] | null>(cached);
+  const revalidator = useRevalidator();
+  const { openFilePicker } = useLayoutCtx();
+  const { drivers } = useLayoutData();
   const [wiping, setWiping] = useState(false);
   useDocumentTitle(pageTitle("Drivers"));
-
-  useEffect(() => {
-    setDrivers(cached);
-  }, [cached]);
-
-  useEffect(() => {
-    let cancelled = false;
-    ListDrivers()
-      .then((d) => !cancelled && setDrivers(d ?? []))
-      .catch((e: unknown) =>
-        toast.error("Failed to load drivers", {
-          description: String((e as Error)?.message ?? e),
-        }),
-      );
-    return () => {
-      cancelled = true;
-    };
-  }, [importTick]);
 
   async function handleWipe() {
     setWiping(true);
     try {
       await WipeDatabase();
-      reloadDrivers();
+      revalidator.revalidate();
       toast.success("Database wiped");
     } catch (e: unknown) {
       toast.error("Wipe failed", { description: String((e as Error)?.message ?? e) });
     } finally {
       setWiping(false);
     }
-  }
-
-  if (drivers === null) {
-    return <DriversLoading />;
   }
 
   if (drivers.length === 0) {
@@ -211,16 +189,6 @@ export function Home() {
           </TableBody>
         </Table>
       </CardContent>
-    </Card>
-  );
-}
-
-function DriversLoading() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Loading drivers…</CardTitle>
-      </CardHeader>
     </Card>
   );
 }

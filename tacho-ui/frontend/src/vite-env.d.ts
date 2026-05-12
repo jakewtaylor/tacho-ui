@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="google.maps" />
 
 interface ImportMetaEnv {
   /** Google Maps JS API key. Set in tacho-ui/frontend/.env.local. */

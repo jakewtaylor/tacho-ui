@@ -140,6 +140,12 @@
   }
 }
 
+@keyframes loader-slide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(150%); }
+  100% { transform: translateX(400%); }
+}
+
 /* Printable weekly report — on-screen preview is white-on-light to match
    what the print output will look like. */
 .print-page {

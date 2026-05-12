@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLoaderData, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,9 @@ import {
   type WeekRestAssessment,
 } from "../weeklyRest";
 import { detectWeekInfringements, type Infringement } from "../infringements";
-import { useDriverData } from "../useDriverData";
 import { useDocumentTitle } from "../useDocumentTitle";
 import { PrintWindow } from "../../wailsjs/go/main/App";
+import type { DriverLoaderData } from "../loaders";
 
 const COLUMNS = [
   { key: "date", label: "Date" },
@@ -43,10 +43,9 @@ const COLUMNS = [
 
 export function PrintWeekPage() {
   const { cardNumber, weekStart } = useParams<{ cardNumber: string; weekStart: string }>();
-  const { data, loading, error } = useDriverData(cardNumber);
+  const data = useLoaderData() as DriverLoaderData;
 
   const computed = useMemo(() => {
-    if (!data) return null;
     const stats = data.dailyRecords.map(computeDailyStats);
     const weeks = groupByWeekSunday(stats);
     const shifts = deriveShifts(data.placeRecords);
@@ -75,8 +74,8 @@ export function PrintWeekPage() {
   }, [data]);
 
   const driverSummary = useMemo(
-    () => driverSummaryFromProfile(data?.profile ?? null),
-    [data?.profile],
+    () => driverSummaryFromProfile(data.profile),
+    [data.profile],
   );
   const driver = driverSummary.find((s) => s.label === "Driver")?.value ?? "—";
   const cardNumberDisplay =
@@ -90,17 +89,6 @@ export function PrintWeekPage() {
   );
 
   if (!cardNumber || !weekStart) return <Navigate to="/" replace />;
-
-  if (error) {
-    return (
-      <div className="p-8 text-sm">
-        <p className="text-red-700">{error}</p>
-      </div>
-    );
-  }
-  if (loading || !data || !computed) {
-    return <div className="p-8 text-sm text-gray-500">Loading…</div>;
-  }
 
   const weekIdx = computed.weeks.findIndex((w) => w.weekStart === weekStart);
   if (weekIdx === -1) {

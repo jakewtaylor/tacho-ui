@@ -1,8 +1,7 @@
 import { useMemo } from "react";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams, useRouteLoaderData } from "react-router-dom";
 import { ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,7 +23,7 @@ import { deriveShifts } from "../shifts";
 import { detectDayInfringements } from "../infringements";
 import { InfringementsPanel } from "../InfringementsPanel";
 import { pageTitle, useDocumentTitle } from "../useDocumentTitle";
-import { useDriverData } from "../useDriverData";
+import type { DriverLoaderData } from "../loaders";
 
 function formatHeading(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -41,47 +40,30 @@ function formatHeading(date: string): string {
 export function DayPage() {
   const { cardNumber, date } = useParams<{ cardNumber: string; date: string }>();
   const navState = useLocation().state as { from?: string } | null;
-  const { data, loading, error } = useDriverData(cardNumber);
+  const data = useRouteLoaderData("driver") as DriverLoaderData;
 
   const sortedDates = useMemo(
     () =>
-      (data?.dailyRecords ?? [])
+      data.dailyRecords
         .map((r) => r.activity_record_date.slice(0, 10))
         .sort((a, b) => a.localeCompare(b)),
-    [data?.dailyRecords],
+    [data.dailyRecords],
   );
 
   const driverName = useMemo(() => {
-    const p = data?.profile;
-    if (!p) return null;
+    const p = data.profile;
     return [p.firstNames, p.surname].filter(Boolean).join(" ") || p.cardNumber;
-  }, [data?.profile]);
+  }, [data.profile]);
   useDocumentTitle(
     pageTitle(date && driverName ? `${date} — ${driverName}` : (date ?? null)),
   );
 
   if (!cardNumber || !date) return <Navigate to="/" replace />;
 
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Failed to load day</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
-    );
-  }
-  if (loading || !data) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Loading day…</CardTitle>
-        </CardHeader>
-      </Card>
-    );
-  }
-
   const idx = sortedDates.indexOf(date);
-  const record = data.dailyRecords.find((r) => r.activity_record_date.slice(0, 10) === date);
+  const record = data.dailyRecords.find(
+    (r) => r.activity_record_date.slice(0, 10) === date,
+  );
 
   if (!record || idx === -1) {
     return (

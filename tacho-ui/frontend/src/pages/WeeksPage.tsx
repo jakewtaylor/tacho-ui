@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, useRouteLoaderData } from "react-router-dom";
 import { CheckCircle2, Printer, ShieldAlert } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,7 +14,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   computeDailyStats,
@@ -39,29 +38,18 @@ import {
   type WeekRestAssessment,
 } from "../weeklyRest";
 import { pageTitle, useDocumentTitle } from "../useDocumentTitle";
-import { useDriverData } from "../useDriverData";
+import type { DriverLoaderData } from "../loaders";
 
 export function WeeksPage() {
-  const { cardNumber } = useParams<{ cardNumber: string }>();
-  const { data, loading, error } = useDriverData(cardNumber);
+  const data = useRouteLoaderData("driver") as DriverLoaderData;
 
   const driverName = useMemo(() => {
-    const p = data?.profile;
-    if (!p) return null;
+    const p = data.profile;
     return [p.firstNames, p.surname].filter(Boolean).join(" ") || p.cardNumber;
-  }, [data?.profile]);
-  useDocumentTitle(
-    pageTitle(driverName ? `Weekly summary — ${driverName}` : "Weekly summary"),
-  );
+  }, [data.profile]);
+  useDocumentTitle(pageTitle(`Weekly summary — ${driverName}`));
 
   const { weeks, recordsByDate, shiftsByDate, weeklyRestByWeek } = useMemo(() => {
-    const empty = {
-      weeks: [] as WeekBucket[],
-      recordsByDate: new Map<string, DailyRecord>(),
-      shiftsByDate: new Map<string, Shift>(),
-      weeklyRestByWeek: new Map<string, WeekRestAssessment>(),
-    };
-    if (!data) return empty;
     const days = data.dailyRecords.map(computeDailyStats);
     const recMap = new Map<string, DailyRecord>();
     for (const r of data.dailyRecords) {
@@ -110,25 +98,6 @@ export function WeeksPage() {
 
   const totalCounts = countInfringements(allItems);
 
-  if (!cardNumber) return <Navigate to="/" replace />;
-
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Failed to load weeks</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
-    );
-  }
-  if (loading || !data) {
-    return (
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-40" />
-        ))}
-      </div>
-    );
-  }
   if (weeks.length === 0) {
     return (
       <Empty>
@@ -157,7 +126,7 @@ export function WeeksPage() {
         {weeks.map((w) => (
           <WeekCard
             key={w.weekStart}
-            cardNumber={cardNumber}
+            cardNumber={data.cardNumber}
             bucket={w}
             infringements={weekInfringements.get(w.weekStart) ?? []}
             weeklyRest={weeklyRestByWeek.get(w.weekStart) ?? null}

@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import {
   Link,
   Outlet,
+  useLoaderData,
   useLocation,
+  useNavigate,
+  useNavigation,
   useOutletContext,
   useParams,
+  useRevalidator,
+  useRouteLoaderData,
 } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -25,13 +30,11 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { ListDrivers } from "../../wailsjs/go/main/App";
+import { ImportDDDFromBytes } from "../../wailsjs/go/main/App";
 import type { db } from "../../wailsjs/go/models";
-import type { AppCtx } from "../App";
+import type { LayoutLoaderData } from "../loaders";
 
-export type LayoutCtx = AppCtx & {
-  drivers: db.DriverSummary[] | null;
-  reloadDrivers: () => void;
+export type LayoutCtx = {
   /** Opens the OS file picker (delegates to react-dropzone). */
   openFilePicker: () => void;
 };
@@ -40,12 +43,42 @@ export function useLayoutCtx() {
   return useOutletContext<LayoutCtx>();
 }
 
-export function AppLayout() {
-  const parent = useOutletContext<AppCtx>();
-  const { importTick, importByBytes, importing, notice } = parent;
+/** Hook for any page nested under the layout to read the sidebar drivers list. */
+export function useLayoutData(): LayoutLoaderData {
+  return useRouteLoaderData("layout") as LayoutLoaderData;
+}
 
-  const [drivers, setDrivers] = useState<db.DriverSummary[] | null>(null);
-  const [reloadTick, setReloadTick] = useState(0);
+export function AppLayout() {
+  const { drivers } = useLoaderData() as LayoutLoaderData;
+  const navigate = useNavigate();
+  const navigation = useNavigation();
+  const revalidator = useRevalidator();
+
+  const [importing, setImporting] = useState(false);
+
+  const importByBytes = useCallback(
+    async (filename: string, bytes: Uint8Array) => {
+      setImporting(true);
+      try {
+        const base64 = uint8ArrayToBase64(bytes);
+        const r = await ImportDDDFromBytes(filename, base64);
+        if (r) {
+          announceImport(r);
+          revalidator.revalidate();
+          if (r.driverCardNumber) {
+            navigate(`/driver/${r.driverCardNumber}`);
+          }
+        }
+      } catch (e: unknown) {
+        toast.error("Import failed", {
+          description: String((e as Error)?.message ?? e),
+        });
+      } finally {
+        setImporting(false);
+      }
+    },
+    [navigate, revalidator],
+  );
 
   const onDrop = useCallback(
     async (accepted: File[], rejected: FileRejection[]) => {
@@ -70,45 +103,10 @@ export function AppLayout() {
     accept: { "application/octet-stream": [".ddd"] },
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    ListDrivers()
-      .then((d) => {
-        if (!cancelled) setDrivers(d ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setDrivers([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [importTick, reloadTick]);
+  const ctx = useMemo<LayoutCtx>(() => ({ openFilePicker: open }), [open]);
 
-  useEffect(() => {
-    if (!notice) return;
-    const r = notice.result;
-    const counts = r.counts ?? {};
-    const summary = Object.entries(counts)
-      .filter(([, v]) => v > 0)
-      .map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`)
-      .join(" · ");
-    const verb = r.alreadyImported ? "Already imported" : "Imported";
-    if (r.alreadyImported) {
-      toast.message(verb, { description: `${r.filename}${summary ? ` — ${summary}` : ""}` });
-    } else {
-      toast.success(verb, { description: `${r.filename}${summary ? ` — ${summary}` : ""}` });
-    }
-  }, [notice]);
-
-  const ctx = useMemo<LayoutCtx>(
-    () => ({
-      ...parent,
-      drivers,
-      reloadDrivers: () => setReloadTick((t) => t + 1),
-      openFilePicker: open,
-    }),
-    [parent, drivers, open],
-  );
+  const isLoading =
+    navigation.state === "loading" || revalidator.state === "loading";
 
   return (
     <div {...getRootProps({ className: "contents" })}>
@@ -116,7 +114,7 @@ export function AppLayout() {
       <SidebarProvider>
         <AppSidebar drivers={drivers} triggerImport={open} importing={importing} />
         <SidebarInset>
-          <Topbar drivers={drivers} />
+          <Topbar drivers={drivers} loading={isLoading} />
           <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
             <Outlet context={ctx} />
           </main>
@@ -135,7 +133,13 @@ export function AppLayout() {
   );
 }
 
-function Topbar({ drivers }: { drivers: db.DriverSummary[] | null }) {
+function Topbar({
+  drivers,
+  loading,
+}: {
+  drivers: db.DriverSummary[];
+  loading: boolean;
+}) {
   const location = useLocation();
   const params = useParams<{ cardNumber?: string; date?: string }>();
 
@@ -166,6 +170,14 @@ function Topbar({ drivers }: { drivers: db.DriverSummary[] | null }) {
           })}
         </BreadcrumbList>
       </Breadcrumb>
+      {loading && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 overflow-hidden"
+        >
+          <div className="h-full w-1/3 animate-[loader-slide_1s_ease-in-out_infinite] bg-primary" />
+        </div>
+      )}
     </header>
   );
 }
@@ -173,11 +185,11 @@ function Topbar({ drivers }: { drivers: db.DriverSummary[] | null }) {
 function buildBreadcrumbs(
   pathname: string,
   params: { cardNumber?: string; date?: string },
-  drivers: db.DriverSummary[] | null,
+  drivers: db.DriverSummary[],
 ): { label: string; href?: string }[] {
   const out: { label: string; href?: string }[] = [{ label: "Drivers", href: "/" }];
   if (!params.cardNumber) return out;
-  const driver = drivers?.find((d) => d.cardNumber === params.cardNumber);
+  const driver = drivers.find((d) => d.cardNumber === params.cardNumber);
   const driverName = driver
     ? [driver.firstNames, driver.surname].filter(Boolean).join(" ") || driver.cardNumber
     : params.cardNumber;
@@ -192,4 +204,37 @@ function buildBreadcrumbs(
     out.push({ label: params.date });
   }
   return out;
+}
+
+function announceImport(r: {
+  alreadyImported: boolean;
+  filename: string;
+  counts?: Record<string, number>;
+}) {
+  const counts = r.counts ?? {};
+  const summary = Object.entries(counts)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`)
+    .join(" · ");
+  const verb = r.alreadyImported ? "Already imported" : "Imported";
+  const description = `${r.filename}${summary ? ` — ${summary}` : ""}`;
+  if (r.alreadyImported) {
+    toast.message(verb, { description });
+  } else {
+    toast.success(verb, { description });
+  }
+}
+
+// Chunked base64 encoder — passing the whole Uint8Array through
+// String.fromCharCode(...) overflows the JS argument stack on MB-scale files.
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, i + chunkSize) as unknown as number[],
+    );
+  }
+  return btoa(binary);
 }
