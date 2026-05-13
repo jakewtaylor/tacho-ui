@@ -8,7 +8,8 @@
   "exports": {
     "./*": "./src/components/*.tsx",
     "./utils": "./src/lib/utils.ts",
-    "./use-mobile": "./src/hooks/use-mobile.ts"
+    "./use-mobile": "./src/hooks/use-mobile.ts",
+    "./styles/theme.css": "./src/styles/theme.css"
   },
   "files": ["src"],
   "peerDependencies": {
