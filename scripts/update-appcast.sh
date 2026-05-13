@@ -70,17 +70,45 @@ if [[ -f "$APPCAST_OUT" ]]; then
     cp -f "$APPCAST_OUT" "$RELEASES_DIR/appcast.xml"
 fi
 
-# The download URL prefix needs the version-prefixed tag path. GitHub Releases
-# puts assets at /releases/download/<tag>/<filename>, where <tag> is "v1.2.3"
-# but our filename and CFBundleShortVersionString are "1.2.3". generate_appcast
-# concatenates the prefix and filename, so we encode the tag into the prefix.
-PREFIX_WITH_TAG="${DOWNLOAD_URL_PREFIX}v${VERSION}/"
+# generate_appcast uses a SINGLE --download-url-prefix for every item in the
+# feed. That doesn't fit GitHub Releases, which puts each version's assets at
+# /releases/download/<tag>/<filename>. Workaround: pass a sentinel prefix here,
+# then post-process the generated XML to rewrite each enclosure URL using the
+# tag that matches its own <sparkle:shortVersionString>. Deltas have their
+# *target* version baked into the filename (tacho-uiX.Y.Z-A.B.C.delta), so
+# they get the same per-item tag as the full zip.
+SENTINEL_PREFIX="https://sentinel.invalid/SENTINEL/"
 
 echo "==> generate_appcast"
 "$GENERATE_APPCAST" \
-    --download-url-prefix "$PREFIX_WITH_TAG" \
+    --download-url-prefix "$SENTINEL_PREFIX" \
     --link "$LINK_URL" \
     "$RELEASES_DIR"
+
+echo "==> rewriting per-item download URLs"
+python3 - "$RELEASES_DIR/appcast.xml" "$DOWNLOAD_URL_PREFIX" "$SENTINEL_PREFIX" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+
+appcast_path, real_prefix, sentinel_prefix = sys.argv[1:4]
+ET.register_namespace("sparkle", "http://www.andymatuschak.org/xml-namespaces/sparkle")
+ns = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
+
+tree = ET.parse(appcast_path)
+for item in tree.getroot().iter("item"):
+    short = item.find("sparkle:shortVersionString", ns)
+    if short is None or not short.text:
+        continue
+    tag = f"v{short.text}/"
+    for enclosure in item.iter("enclosure"):
+        url = enclosure.get("url", "")
+        enclosure.set("url", url.replace(sentinel_prefix, real_prefix + tag))
+    for enclosure in item.iter("{http://www.andymatuschak.org/xml-namespaces/sparkle}deltas"):
+        for d in enclosure.iter("enclosure"):
+            url = d.get("url", "")
+            d.set("url", url.replace(sentinel_prefix, real_prefix + tag))
+
+tree.write(appcast_path, encoding="utf-8", xml_declaration=True)
+PY
 
 # Copy the produced appcast.xml back to docs/ for committing.
 cp -f "$RELEASES_DIR/appcast.xml" "$APPCAST_OUT"

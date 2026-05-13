@@ -1,7 +1,19 @@
-<?xml version="1.0" standalone="yes"?>
+<?xml version='1.0' encoding='utf-8'?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>tacho-ui</title>
+        <item>
+            <title>0.1.1</title>
+            <pubDate>Wed, 13 May 2026 10:03:52 +0100</pubDate>
+            <link>https://github.com/jakewtaylor/tacho-ui</link>
+            <sparkle:version>0.1.1</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>10.13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/jakewtaylor/tacho-ui/releases/download/v0.1.1/tacho-ui-0.1.1.zip" length="12901053" type="application/octet-stream" sparkle:edSignature="KZ0tHmU/887DQr3WPuVnRvoW6Pw/fWCwby3bf8clFWNIGWlHhmq6Uglrex0ByConIeyJydQnemwgQq/4D6YTAw==" />
+            <sparkle:deltas>
+                <enclosure url="https://github.com/jakewtaylor/tacho-ui/releases/download/v0.1.1/tacho-ui0.1.1-0.1.0.delta" sparkle:deltaFrom="0.1.0" length="237626" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="rhGin10x44oJW11vNRkuotB9VoStgp4BE6jeDGqdwnB7UO3Ol6bC+h1O1WsDZ1hYiMwXePVvQAAGy/YXrlp7Bw==" />
+            </sparkle:deltas>
+        </item>
         <item>
             <title>0.1.0</title>
             <pubDate>Wed, 13 May 2026 09:41:14 +0100</pubDate>
@@ -9,7 +21,7 @@
             <sparkle:version>0.1.0</sparkle:version>
             <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/jakewtaylor/tacho-ui/releases/download/v0.1.0/tacho-ui-0.1.0.zip" length="12901141" type="application/octet-stream" sparkle:edSignature="E/XyZ8BtsCjied+jxW19Q5J9dTN9ifwauW43V8bGEtXwjOg2MDXJbWNzGw6eNBrO7NQB/rD+wfkwB5aM6aSOAg=="/>
+            <enclosure url="https://github.com/jakewtaylor/tacho-ui/releases/download/v0.1.0/tacho-ui-0.1.0.zip" length="12901141" type="application/octet-stream" sparkle:edSignature="E/XyZ8BtsCjied+jxW19Q5J9dTN9ifwauW43V8bGEtXwjOg2MDXJbWNzGw6eNBrO7NQB/rD+wfkwB5aM6aSOAg==" />
         </item>
     </channel>
 </rss>
