@@ -1,0 +1,202 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Need contents:write to create the GitHub Release AND to push the updated
+# appcast.xml back to main.
+permissions:
+  contents: write
+
+concurrency:
+  # One release at a time. Cancelling an in-flight release would orphan a
+  # notarization submission, so we let prior runs finish.
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # macos-14 is Apple Silicon. release.sh builds darwin/universal so the
+    # output works on both architectures regardless of the runner's arch.
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need full history so `git describe --tags` resolves the running
+          # tag plus any future "between tags" annotations.
+          fetch-depth: 0
+          # Use a PAT-free token that can push back to main with the updated
+          # appcast at the end of the job.
+          persist-credentials: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      # -- Test gates -----------------------------------------------------
+      - name: Go tests
+        run: go test ./...
+
+      - name: Frontend typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Frontend tests
+        working-directory: frontend
+        run: npx vitest run
+
+      # -- Toolchain ------------------------------------------------------
+      - name: Install Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Fetch Sparkle SDK
+        # release.sh expects third_party/Sparkle/Sparkle.framework and the
+        # release tooling under third_party/Sparkle/bin. Download the same
+        # version we use locally so signatures verify against our embedded
+        # SUPublicEDKey.
+        run: |
+          set -euxo pipefail
+          mkdir -p third_party/Sparkle
+          curl -fL -o /tmp/Sparkle.tar.xz \
+            https://github.com/sparkle-project/Sparkle/releases/download/2.9.1/Sparkle-2.9.1.tar.xz
+          tar -xJf /tmp/Sparkle.tar.xz -C third_party/Sparkle
+          ls third_party/Sparkle
+
+      # -- Code-signing keychain -----------------------------------------
+      - name: Import signing certs + Sparkle key into a temp keychain
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PWD }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          # Persistable across steps via $GITHUB_ENV.
+          KEYCHAIN=$RUNNER_TEMP/build.keychain-db
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+          # Create and unlock. -u marks it usable in the default search list.
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+
+          # Make the new keychain the default + add to search list so codesign
+          # and notarytool find the cert / app-specific password.
+          security default-keychain -s "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+
+          # Import the Developer ID Application cert (.p12).
+          P12=$RUNNER_TEMP/cert.p12
+          echo -n "$MACOS_CERTIFICATE" | base64 --decode -o "$P12"
+          security import "$P12" \
+            -k "$KEYCHAIN" \
+            -P "$MACOS_CERTIFICATE_PWD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          rm -f "$P12"
+
+          # Allow codesign/Sparkle tools to access keys non-interactively.
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign:,unsigned: \
+            -s -k "$KEYCHAIN_PWD" "$KEYCHAIN" \
+            >/dev/null
+
+          # Import the Sparkle EdDSA private key under the same identifier
+          # generate_keys uses on a developer machine. sign_update + the
+          # generate_appcast tooling look for service=https://sparkle-project.org
+          # account=ed25519.
+          security add-generic-password \
+            -s "https://sparkle-project.org" \
+            -a "ed25519" \
+            -w "$SPARKLE_PRIVATE_KEY" \
+            -T "$(pwd)/third_party/Sparkle/bin/sign_update" \
+            -T "$(pwd)/third_party/Sparkle/bin/generate_appcast" \
+            "$KEYCHAIN"
+
+      - name: Store notarytool credentials
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PWD: ${{ secrets.APPLE_APP_PWD }}
+          KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PWD }}
+        run: |
+          # release.sh uses --keychain-profile "tacho-ui-notarize"; store it
+          # against the same keychain we just created.
+          xcrun notarytool store-credentials "tacho-ui-notarize" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PWD" \
+            --keychain "$KEYCHAIN"
+
+      # -- Build, sign, notarize, staple, DMG ----------------------------
+      - name: Release pipeline
+        run: ./scripts/release.sh
+
+      - name: Generate signed appcast
+        run: ./scripts/update-appcast.sh
+
+      # -- Publish --------------------------------------------------------
+      - name: Read version from bundle
+        id: ver
+        run: |
+          V=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" \
+              build/bin/tacho-ui.app/Contents/Info.plist)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          ASSETS=(
+            "build/bin/tacho-ui-${V}.dmg"
+            "releases/tacho-ui-${V}.zip"
+          )
+          # Delta files are only produced when there's a prior release to
+          # diff against. Glob them in if they exist.
+          for d in releases/tacho-ui${V}-*.delta; do
+            [[ -e "$d" ]] && ASSETS+=("$d")
+          done
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            "${ASSETS[@]}"
+
+      - name: Commit + push updated appcast
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/appcast.xml; then
+            echo "No appcast changes — skipping commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/appcast.xml
+          # [skip ci] keeps this commit from re-triggering CI workflows
+          # listening on push to main (no harm here, but conventional).
+          git commit -m "Publish appcast for ${GITHUB_REF_NAME} [skip ci]"
+          git push origin "HEAD:${{ github.event.repository.default_branch }}"
