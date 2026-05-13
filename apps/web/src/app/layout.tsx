@@ -1,11 +1,31 @@
 import type { Metadata } from "next";
-import "@tacholens/ui/globals.css";
+import "./globals.css";
+
+const title = "TachoLens — see your tacho data clearly";
+const description =
+  "A local-first macOS app for EU driver-card tachograph downloads. Driving sessions, breaks, weekly summaries, and EU 561/2006 compliance — without uploading anything anywhere.";
 
 export const metadata: Metadata = {
-  title: "TachoLens — see your tacho data clearly",
-  description:
-    "A macOS desktop app for inspecting EU driver-card tachograph downloads. Compliance analysis, weekly summaries, GNSS map.",
+  title,
+  description,
   metadataBase: new URL("https://tacholens.com"),
+  openGraph: {
+    type: "website",
+    title,
+    description,
+    url: "https://tacholens.com",
+    siteName: "TachoLens",
+    images: ["/appicon.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: ["/appicon.png"],
+  },
+  icons: {
+    icon: "/appicon.png",
+  },
 };
 
 export default function RootLayout({

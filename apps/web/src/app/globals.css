@@ -1,0 +1,95 @@
+@import "@tacholens/ui/globals.css";
+
+/* Marketing-site-specific tokens. The brand primary is already in the
+ * shared theme (`--primary`); these supplement it with the editorial
+ * paper/ink scale and the EU 165/2014 work-type palette so the
+ * embedded chart matches what the desktop app actually renders. */
+:root {
+  --brand: oklch(0.511 0.096 186.391);
+  --brand-soft: oklch(0.94 0.025 186);
+  --brand-hairline: oklch(0.88 0.03 186);
+
+  /* Paper / ink — warm near-white background, cool deep ink. */
+  --paper: oklch(0.985 0.004 80);
+  --paper-2: oklch(0.97 0.005 80);
+  --ink: oklch(0.18 0.01 250);
+  --ink-2: oklch(0.36 0.01 250);
+  --ink-3: oklch(0.56 0.01 250);
+  --hairline: oklch(0.9 0.005 250);
+  --hairline-strong: oklch(0.82 0.006 250);
+
+  /* EU 165/2014 work-type semantic palette — identical to the desktop
+   * (apps/desktop/frontend/src/style.css) so the hero chart reads the same. */
+  --driving: oklch(0.72 0.16 145);
+  --work: oklch(0.66 0.13 250);
+  --available: oklch(0.78 0.15 80);
+  --rest: oklch(0.55 0.02 250);
+  --no-card: oklch(0.5 0.02 250 / 0.35);
+  --breach: oklch(0.6 0.22 27);
+}
+
+/* Expose the tokens as Tailwind utilities so we can write
+ * `bg-paper`, `text-ink-2`, `border-hairline`, etc. natively. */
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle radial dot grain — applied to the hero only. */
+.paper-grain {
+  background-image: radial-gradient(rgba(20, 30, 40, 0.025) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+/* Plotting paper — backs the privacy diagram. */
+.grid-paper {
+  background-image:
+    linear-gradient(to right, oklch(0.9 0.005 250 / 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.9 0.005 250 / 0.5) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Blinking caret used in the spec mark + the footer URL. */
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+.blink {
+  animation: blink 1.05s steps(2, start) infinite;
+}
+
+/* "§ section-label" eyebrow — small uppercase mono in brand colour. */
+.eyebrow {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.eyebrow::before {
+  content: "§ ";
+  opacity: 0.6;
+}
+
+html {
+  scroll-behavior: smooth;
+}
