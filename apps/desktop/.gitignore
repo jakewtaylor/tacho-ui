@@ -1,0 +1,24 @@
+# Build artefacts
+/build/bin/
+/tacho-ui
+/frontend/dist/
+/frontend/node_modules/
+/frontend/package.json.md5
+
+# Generated from icons/ by scripts/build-icns.sh — rebuildable, not source.
+/build/darwin/appicon.icns
+/build/darwin/appicon.iconset/
+
+# Transient: submission ID stashed by release.sh, consumed by finish-release.sh
+/.notarization-id
+
+# Staging directory for Sparkle's generate_appcast (zip artefacts; the
+# appcast.xml that ships in /docs is generated separately and IS committed).
+/releases/
+
+# Local-only env (Google Maps API key, etc.)
+/frontend/.env
+/frontend/.env.local
+
+# Sparkle SDK is downloaded fresh in CI; locally extracted into here.
+/third_party/

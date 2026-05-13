@@ -1,4 +1,8 @@
-# PII: real driver-card data and parsed dumps
+# Monorepo-wide gitignore. Package-specific patterns live in each
+# apps/*/.gitignore.
+
+# PII: real driver-card data and parsed dumps (kept locally at the
+# monorepo root for the desktop app's smoke test).
 *.ddd
 output.json
 output.err
@@ -10,30 +14,7 @@ output.err
 # kept here for source inspection only). Not part of this repo.
 /tachoparser/
 
-# Build artefacts
-/build/bin/
-/tacho-ui
-/frontend/dist/
-/frontend/node_modules/
-/frontend/package.json.md5
-
-# Generated from icons/ by scripts/build-icns.sh — rebuildable, not source.
-/build/darwin/appicon.icns
-/build/darwin/appicon.iconset/
-
-# Transient: submission ID stashed by release.sh, consumed by finish-release.sh
-/.notarization-id
-
-# Staging directory for Sparkle's generate_appcast (zip artefacts; appcast.xml
-# is copied out to docs/appcast.xml and that one IS committed).
-/releases/
-
-# Local-only env (Google Maps API key, etc.)
-/frontend/.env
-/frontend/.env.local
-
 # Editor / OS noise
 *.swp
 *.swo
 Thumbs.db
-third_party/

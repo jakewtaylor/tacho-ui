@@ -21,13 +21,14 @@ set -euo pipefail
 
 # -- config -------------------------------------------------------------------
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DESKTOP_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MONO_ROOT="$(cd "$DESKTOP_ROOT/../.." && pwd)"
 APP_NAME="tacho-ui"
-APP_PATH="$REPO_ROOT/build/bin/$APP_NAME.app"
-ZIP_PATH="$REPO_ROOT/build/bin/$APP_NAME.zip"
-ENTITLEMENTS="$REPO_ROOT/build/darwin/entitlements.plist"
+APP_PATH="$DESKTOP_ROOT/build/bin/$APP_NAME.app"
+ZIP_PATH="$DESKTOP_ROOT/build/bin/$APP_NAME.zip"
+ENTITLEMENTS="$DESKTOP_ROOT/build/darwin/entitlements.plist"
 NOTARY_PROFILE="${NOTARY_PROFILE:-tacho-ui-notarize}"
-SPARKLE_FRAMEWORK="$REPO_ROOT/third_party/Sparkle/Sparkle.framework"
+SPARKLE_FRAMEWORK="$DESKTOP_ROOT/third_party/Sparkle/Sparkle.framework"
 
 # Auto-discover the Developer ID Application signing identity. Override by
 # exporting SIGNING_IDENTITY if you have multiple Developer ID certs and want
@@ -52,7 +53,7 @@ if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
     exit 1
 fi
 
-cd "$REPO_ROOT"
+cd "$DESKTOP_ROOT"
 
 # Version: prefer the exact tag, fall back to `<tag>-<n>-g<sha>` for between-tag
 # builds, fall back to a short sha for repos with no tags. Strip leading `v` for
@@ -111,10 +112,10 @@ wails build -platform darwin/universal -trimpath -clean -skipbindings \
 # which seals Contents/Resources/.
 echo
 echo "==> swapping in hand-tuned .icns"
-"$REPO_ROOT/scripts/build-icns.sh"
+"$DESKTOP_ROOT/scripts/build-icns.sh"
 RESOURCES_DIR="$APP_PATH/Contents/Resources"
-cp -f "$REPO_ROOT/build/darwin/appicon.icns" "$RESOURCES_DIR/iconfile.icns"
-cp -f "$REPO_ROOT/build/darwin/appicon.icns" "$RESOURCES_DIR/dddFileIcon.icns"
+cp -f "$DESKTOP_ROOT/build/darwin/appicon.icns" "$RESOURCES_DIR/iconfile.icns"
+cp -f "$DESKTOP_ROOT/build/darwin/appicon.icns" "$RESOURCES_DIR/dddFileIcon.icns"
 
 # -- embed Sparkle.framework --------------------------------------------------
 
@@ -181,7 +182,7 @@ echo "==> submitting to Apple notary service"
 # Submit WITHOUT --wait so we can stash the submission ID before polling. If
 # the polling step is interrupted (laptop sleeps, network drops, Ctrl-C), the
 # notarization continues server-side and ./scripts/finish-release.sh resumes.
-ID_FILE="$REPO_ROOT/.notarization-id"
+ID_FILE="$DESKTOP_ROOT/.notarization-id"
 submit_out="$(xcrun notarytool submit "$ZIP_PATH" --keychain-profile "$NOTARY_PROFILE" 2>&1)"
 echo "$submit_out"
 SUB_ID="$(echo "$submit_out" | awk -F': ' '/^[[:space:]]*id:/ {print $2; exit}')"
@@ -202,4 +203,4 @@ echo "      ./scripts/finish-release.sh"
 restore_wails_json
 trap - EXIT
 
-exec "$REPO_ROOT/scripts/finish-release.sh" "$SUB_ID"
+exec "$DESKTOP_ROOT/scripts/finish-release.sh" "$SUB_ID"

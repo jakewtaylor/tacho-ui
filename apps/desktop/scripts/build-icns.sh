@@ -13,10 +13,10 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$REPO_ROOT/icons"
-ICONSET="$REPO_ROOT/build/darwin/appicon.iconset"
-OUT="$REPO_ROOT/build/darwin/appicon.icns"
+DESKTOP_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC="$DESKTOP_ROOT/icons"
+ICONSET="$DESKTOP_ROOT/build/darwin/appicon.iconset"
+OUT="$DESKTOP_ROOT/build/darwin/appicon.icns"
 
 # Apple's iconutil expects this exact naming inside .iconset. The mapping
 # from Bakery's filenames to Apple's spec is purely about labels — the

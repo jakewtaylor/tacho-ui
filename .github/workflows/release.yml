@@ -25,6 +25,13 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# Most steps act on the desktop app under apps/desktop/. docs/appcast.xml is
+# the one exception that lives at the monorepo root (its URL is baked into
+# every shipped binary's Sparkle SUFeedURL).
+defaults:
+  run:
+    working-directory: apps/desktop
+
 jobs:
   release:
     # macos-14 is Apple Silicon. release.sh builds darwin/universal so the
@@ -47,16 +54,17 @@ jobs:
         with:
           go-version: "1.23"
           cache: true
+          cache-dependency-path: apps/desktop/go.sum
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/desktop/frontend/package-lock.json
 
       - name: Install frontend deps
-        working-directory: frontend
+        working-directory: apps/desktop/frontend
         run: npm ci
 
       # -- Test gates -----------------------------------------------------
@@ -64,7 +72,7 @@ jobs:
       # //go:embed all:frontend/dist — that path must exist (even empty
       # would do for embedding purposes, but a real build catches typos).
       - name: Build frontend (for go:embed)
-        working-directory: frontend
+        working-directory: apps/desktop/frontend
         run: npm run build
 
       - name: Go tests
@@ -73,11 +81,11 @@ jobs:
         run: go test $(go list ./... | grep -v '/frontend/')
 
       - name: Frontend typecheck
-        working-directory: frontend
+        working-directory: apps/desktop/frontend
         run: npx tsc --noEmit
 
       - name: Frontend tests
-        working-directory: frontend
+        working-directory: apps/desktop/frontend
         run: npx vitest run
 
       # -- Toolchain ------------------------------------------------------
@@ -90,8 +98,8 @@ jobs:
         run: brew install create-dmg
 
       - name: Fetch Sparkle SDK
-        # release.sh expects third_party/Sparkle/Sparkle.framework and the
-        # release tooling under third_party/Sparkle/bin. Download the same
+        # release.sh expects third_party/Sparkle/Sparkle.framework + tooling
+        # under apps/desktop/third_party/Sparkle/bin. Download the same
         # version we use locally so signatures verify against our embedded
         # SUPublicEDKey.
         run: |
@@ -205,6 +213,8 @@ jobs:
             "${ASSETS[@]}"
 
       - name: Commit + push updated appcast
+        # docs/appcast.xml lives at the monorepo root, not under apps/desktop.
+        working-directory: .
         run: |
           set -euo pipefail
           if git diff --quiet -- docs/appcast.xml; then

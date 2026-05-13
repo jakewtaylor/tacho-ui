@@ -18,9 +18,9 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP_PATH="$REPO_ROOT/build/bin/tacho-ui.app"
-ID_FILE="$REPO_ROOT/.notarization-id"
+DESKTOP_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+APP_PATH="$DESKTOP_ROOT/build/bin/tacho-ui.app"
+ID_FILE="$DESKTOP_ROOT/.notarization-id"
 NOTARY_PROFILE="${NOTARY_PROFILE:-tacho-ui-notarize}"
 
 SUB_ID="${1:-}"
@@ -92,7 +92,7 @@ spctl --assess --type execute --verbose=2 "$APP_PATH"
 # stapled so the DMG filename is deterministic from the build output, not the
 # invocation context.
 VERSION_PLIST=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist")
-DMG_PATH="$REPO_ROOT/build/bin/tacho-ui-${VERSION_PLIST}.dmg"
+DMG_PATH="$DESKTOP_ROOT/build/bin/tacho-ui-${VERSION_PLIST}.dmg"
 
 if command -v create-dmg >/dev/null 2>&1; then
     echo
@@ -123,5 +123,5 @@ echo
 echo "✓ release ready"
 echo "  app: $APP_PATH"
 [[ -f "$DMG_PATH" ]] && echo "  dmg: $DMG_PATH"
-echo "  zip: $REPO_ROOT/build/bin/tacho-ui.zip"
+echo "  zip: $DESKTOP_ROOT/build/bin/tacho-ui.zip"
 rm -f "$ID_FILE"

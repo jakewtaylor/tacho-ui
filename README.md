@@ -1,71 +1,56 @@
-# TachoLens
+# tacholens
 
-A macOS desktop app for inspecting EU driver-card tachograph downloads
-(`.ddd` files). Built with Wails — Go backend, React/TypeScript frontend.
+Monorepo for **TachoLens** — a tachograph data viewer.
 
-Drop a `.ddd` file in, see every shift, every break, every minute over
-the EU 561/2006 driving limits.
+| Package | What it is | Path |
+| ------- | ---------- | ---- |
+| `apps/desktop` | macOS Wails app (Go + React) for parsing and analysing `.ddd` driver-card downloads | `apps/desktop` |
+| `apps/web` | Marketing / landing page at [tacholens.com](https://tacholens.com) | `apps/web` |
 
-## What it does
+Shared infrastructure at the monorepo root:
 
-- Parses driver-card downloads via [`tachoparser`](https://github.com/traconiq/tachoparser).
-- Persists into a local SQLite store (`~/Library/Application Support/tacho-ui/tacho.db`)
-  so you can keep importing weekly downloads and the history accumulates.
-- Compliance analysis built on EU 561/2006:
-  - Continuous-driving breaches (>4h30m without a qualifying break)
-  - 15+30 split-break detection per Art. 7
-  - Daily / weekly / fortnightly driving limits
-  - Daily-rest insufficient / reduced
-  - Weekly-rest verified / reduced / inconclusive (card-not-inserted aware)
-- GNSS map for Gen-2 cards (Google Maps; needs an API key locally).
-- Printable A4 weekly report.
-
-## Install
-
-Download the latest `.dmg` from the
-[Releases page](https://github.com/jakewtaylor/tacho-ui/releases),
-open it, drag the app into Applications. Code-signed + notarized — opens
-without Gatekeeper warnings. Auto-updates via Sparkle.
+- `docs/appcast.xml` — Sparkle update feed for the desktop app. URL is baked
+  into every shipped binary; **do not** move this file.
+- `.github/workflows/release.yml` — CI for the desktop release pipeline,
+  triggered on `v*` tags.
 
 ## Develop
 
-Requires Go 1.23+, Node 20+, and the Wails CLI.
+Each package is independent. Pick one and `cd` into it.
+
+### Desktop app
 
 ```bash
-# Hot-reloading dev mode
-wails dev
-
-# Production build (unsigned; for testing the bundle)
-wails build
-
-# Tests
+cd apps/desktop
+wails dev                 # hot-reload dev mode
 go test ./...
-cd frontend && npm test
+cd frontend && npm test   # vitest rules-engine suite
 ```
 
-For the full release pipeline (sign + notarize + DMG + Sparkle appcast)
-see `scripts/release.sh` and the GitHub Actions workflow at
-`.github/workflows/release.yml`. Releases are triggered by pushing a
-`v*` tag.
+For release builds (sign + notarize + DMG + Sparkle appcast), see
+`apps/desktop/scripts/release.sh` and the GitHub Actions workflow. Releases
+are triggered by pushing a `v*` tag from the monorepo root.
 
-## Project layout
+### Landing page
 
-- `app.go`, `main.go` — Wails bindings + entry point.
-- `internal/db/` — SQLite store, migrations, queries.
-- `internal/importer/` — `.ddd` parse + dedup + write.
-- `internal/updater/` — Sparkle bridge (CGo, macOS-only).
-- `frontend/` — React + Vite UI, rules engine (`activity.ts`,
-  `infringements.ts`, `weeklyRest.ts`).
-- `build/darwin/` — `Info.plist`, entitlements, app icon source.
-- `icons/` — Bakery-exported per-size PNGs; `scripts/build-icns.sh`
-  assembles them into an `.icns` at release time.
-- `scripts/` — release pipeline.
-- `docs/appcast.xml` — Sparkle update feed, regenerated on every release.
+```bash
+cd apps/web
+npm run dev               # http://localhost:3000
+npm run build             # static export, ready for Vercel
+```
 
-## A note on identifiers
+## Deploy
 
-The product display name is **TachoLens** and the macOS bundle
-identifier is `com.tacholens.app`. The Go module name and the on-disk
-SQLite directory (`~/Library/Application Support/tacho-ui/`) are still
-`tacho-ui` — that's the historical internal identifier, kept as-is to
-avoid breaking existing user data.
+- **Desktop**: tag a release (`git tag v0.1.x && git push origin v0.1.x`).
+  CI handles the rest; users on older versions auto-update via Sparkle.
+- **Web**: hosted on Vercel. Connect the repo, set **Root Directory** to
+  `apps/web` in the Vercel project settings. Pushes to `main` deploy
+  automatically; preview deployments fire on every PR.
+
+## Identifiers (worth knowing)
+
+- Product display name: **TachoLens**
+- macOS bundle ID: `com.tacholens.app`
+- Go module name: `tacho-ui` (historical; kept stable to avoid breaking
+  data on existing installs)
+- On-disk data path: `~/Library/Application Support/tacho-ui/tacho.db`

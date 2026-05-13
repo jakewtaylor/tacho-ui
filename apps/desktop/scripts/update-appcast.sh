@@ -18,13 +18,16 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DESKTOP_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# docs/appcast.xml lives at the monorepo root — its URL is baked into
+# every shipped binary's Info.plist (SUFeedURL) and must stay there.
+MONO_ROOT="$(cd "$DESKTOP_ROOT/../.." && pwd)"
 APP_NAME="tacho-ui"
-APP_PATH="$REPO_ROOT/build/bin/$APP_NAME.app"
-ZIP_PATH="$REPO_ROOT/build/bin/$APP_NAME.zip"
-RELEASES_DIR="$REPO_ROOT/releases"
-APPCAST_OUT="$REPO_ROOT/docs/appcast.xml"
-GENERATE_APPCAST="$REPO_ROOT/third_party/Sparkle/bin/generate_appcast"
+APP_PATH="$DESKTOP_ROOT/build/bin/$APP_NAME.app"
+ZIP_PATH="$DESKTOP_ROOT/build/bin/$APP_NAME.zip"
+RELEASES_DIR="$DESKTOP_ROOT/releases"
+APPCAST_OUT="$MONO_ROOT/docs/appcast.xml"
+GENERATE_APPCAST="$DESKTOP_ROOT/third_party/Sparkle/bin/generate_appcast"
 
 # Public download URL prefix. generate_appcast prepends this to each item's
 # zip filename when writing <enclosure url="..."> in the appcast. The release

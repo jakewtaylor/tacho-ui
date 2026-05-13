@@ -4,12 +4,18 @@ A desktop tachograph file viewer. Drop a `.ddd` file in, see the contents.
 
 ## Layout
 
-The Wails app lives at the repo root (Go module `tacho-ui`). The `tachoparser/` sibling directory is reference material only.
+This is a monorepo. Two packages under `apps/`:
 
-- `app.go`, `main.go`, `app_test.go`, `internal/`, `frontend/`, `build/`, `wails.json`, `go.mod` — the Wails v2 desktop app (Go backend + React-TS frontend).
+- `apps/desktop/` — the Wails v2 macOS app (Go backend + React-TS frontend). Go module `tacho-ui`. Everything below — `app.go`, `internal/`, `frontend/`, `build/`, `wails.json`, `scripts/release.sh` etc. — is relative to this directory unless stated otherwise.
+- `apps/web/` — the marketing landing page at tacholens.com. Next.js 16 (App Router) + Tailwind 4. Deploys to Vercel; Root Directory must be set to `apps/web` in the project settings.
+
+Shared at the monorepo root:
+
+- `docs/appcast.xml` — Sparkle update feed for the desktop app. The URL `raw.githubusercontent.com/.../main/docs/appcast.xml` is baked into every shipped binary; **do not move this file**.
+- `.github/workflows/release.yml` — desktop release CI, fires on `v*` tag.
 - `tachoparser/` — local reference clone of `github.com/traconiq/tachoparser`. **Not a dependency** — the app pulls tachoparser as a normal Go module via `go get`. This directory is kept for source inspection only.
-- `C_20260509_1146_M_TAYLOR_DB141641620128.ddd` — sample driver-card file (`C_` prefix = card).
-- `output.json` — sample parsed output from `dddparser -card` on the file above (~1.8 MB). Useful as a reference for the JSON shape the UI needs to render.
+- `C_20260509_1146_M_TAYLOR_DB141641620128.ddd` — sample driver-card file (`C_` prefix = card). Gitignored (PII).
+- `output.json` — sample parsed output from `dddparser -card` on the file above (~1.8 MB). Useful as a reference for the JSON shape the UI needs to render. Gitignored.
 
 ## tachoparser library API
 
@@ -50,22 +56,33 @@ So the app can ship its own `certs/pks{1,2}/*.bin` and a small `init()` that doe
 
 ## Running the pieces
 
-All commands run from the repo root.
+Desktop commands run from `apps/desktop/`. Web commands run from `apps/web/`.
 
 ```bash
-# Run the app in dev mode (hot reload, dev server at http://localhost:34115 for browser-side calls)
+# Desktop ----------------------------------------------------------
+cd apps/desktop
+
+# Hot-reload dev mode (Vite dev server at http://localhost:34115)
 wails dev
 
-# Production build → build/bin/tacho-ui.app
+# Production build → apps/desktop/build/bin/tacho-ui.app
 wails build
 
-# Tests (parses the sample .ddd in-process and asserts driver fields)
-go test -v
+# Go smoke test (parses the sample .ddd in-process)
+go test ./...
 
 # Frontend tests (vitest, rules-engine coverage)
 cd frontend && npm test
 
-# Standalone parser CLI (reference)
+# Full signed release pipeline (Developer ID + notarization + DMG + appcast)
+./scripts/release.sh
+
+# Web --------------------------------------------------------------
+cd apps/web
+npm run dev    # http://localhost:3000
+npm run build  # static export, Vercel-ready
+
+# Standalone parser CLI (reference, at monorepo root)
 ./tachoparser/cmd/dddparser/dddparser -card < C_20260509_1146_M_TAYLOR_DB141641620128.ddd > output.json
 ```
 
@@ -210,10 +227,10 @@ The sample card illustrates why the inconclusive verdict matters: only 1 verifie
 
 ## Repository state
 
-The repo root is a git repo. The `tachoparser/` sibling is a separate checkout (its own `.git`). `.gitignore` excludes the sample `.ddd` (PII), the parsed `output.json/err`, the `tachoparser/` clone, and all build/node_modules/env artefacts.
+The monorepo root is a git repo. The `tachoparser/` sibling is a separate checkout (its own `.git`). `.gitignore` excludes the sample `.ddd` (PII), the parsed `output.json/err`, the `tachoparser/` clone, and all build/node_modules/env artefacts.
 
 ## Notes / decisions
 
-- Working directory is `/Users/jake/code/tachograph-viewer` (the repo root). All commands run from there — no more `cd tacho-ui` step.
+- Working directory is `/Users/jake/code/tachograph-viewer` (the monorepo root). For desktop work, `cd apps/desktop` first.
 - The `.ddd` sample contains real PII (driver name "MARK WILLIAM TAYLOR", DOB, card number). Don't commit it or paste contents into anywhere logged.
 - `output.err` from the sample parse shows `warn: CHR mismatch` repeatedly — that's expected without pks2 keys (2nd-gen signature verification fails). The trailing `trying to wrap around for the second time, stop parsing` is the normal end-of-stream signal, not an error.
