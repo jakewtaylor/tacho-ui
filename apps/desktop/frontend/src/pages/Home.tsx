@@ -13,9 +13,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from "@tacholens/ui/alert-dialog";
+import { Badge } from "@tacholens/ui/badge";
+import { Button } from "@tacholens/ui/button";
 import {
   Card,
   CardAction,
@@ -23,7 +23,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@tacholens/ui/card";
 import {
   Empty,
   EmptyContent,
@@ -31,7 +31,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@tacholens/ui/empty";
 import {
   Table,
   TableBody,
@@ -39,7 +39,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@tacholens/ui/table";
 import type { WipeActionResult } from "../actions";
 import { useLayoutCtx, useLayoutData } from "../layouts/app-layout";
 import { nationName } from "../nations";

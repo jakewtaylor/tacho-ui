@@ -1,10 +1,10 @@
 import { Link, useParams } from "react-router-dom";
 import { CheckCircle2, Info, ShieldAlert, TriangleAlert } from "lucide-react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@tacholens/ui/alert";
+import { Badge } from "@tacholens/ui/badge";
+import { Card, CardContent } from "@tacholens/ui/card";
+import { cn } from "@tacholens/ui/utils";
 import {
   countInfringements,
   type Infringement,

@@ -3,8 +3,8 @@ import { createRoot } from "react-dom/client";
 import { createHashRouter, RouterProvider } from "react-router-dom";
 
 import "./style.css";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@tacholens/ui/sonner";
+import { TooltipProvider } from "@tacholens/ui/tooltip";
 import { importAction, importFromPathAction, wipeAction } from "./actions";
 import { AppLayout } from "./layouts/app-layout";
 import { driverLoader, layoutLoader } from "./loaders";

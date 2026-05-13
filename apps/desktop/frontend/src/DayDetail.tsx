@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import { TriangleAlert } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@tacholens/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@tacholens/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@tacholens/ui/collapsible";
+import { ScrollArea } from "@tacholens/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -16,7 +16,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@tacholens/ui/table";
 import {
   computeDayDetail,
   formatClock,

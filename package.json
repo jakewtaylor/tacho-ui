@@ -1,0 +1,19 @@
+{
+  "name": "tacholens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TachoLens monorepo — desktop app, landing page, shared UI.",
+  "workspaces": ["apps/desktop/frontend", "apps/web", "packages/*"],
+  "scripts": {
+    "dev:web": "turbo run dev --filter=web",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "turbo run format"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  },
+  "packageManager": "npm@11.12.1"
+}

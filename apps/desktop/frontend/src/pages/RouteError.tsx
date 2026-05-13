@@ -1,7 +1,7 @@
 import { Link, isRouteErrorResponse, useRouteError } from "react-router-dom";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@tacholens/ui/alert";
+import { Button } from "@tacholens/ui/button";
 
 export function RouteError() {
   const error = useRouteError();

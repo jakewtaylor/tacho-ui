@@ -4,6 +4,11 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/dm-sans";
 
+/* Tailwind v4 auto-detects content via imports, but workspace packages
+   resolve to node_modules symlinks which Tailwind's default scanner skips.
+   Make the shared package's source explicit. */
+@source "../../../../packages/ui/src";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

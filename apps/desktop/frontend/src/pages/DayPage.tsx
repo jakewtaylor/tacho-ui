@@ -8,20 +8,20 @@ import {
 } from "react-router-dom";
 import { ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@tacholens/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@tacholens/ui/card";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@tacholens/ui/empty";
 import { DayDetail } from "../DayDetail";
 import { MapPanel } from "../MapPanel";
 import {

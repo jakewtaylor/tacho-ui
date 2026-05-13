@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* See note in apps/desktop/frontend/src/style.css — Tailwind needs the
+   shared package's source path made explicit. */
+@source "../../../../packages/ui/src";
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

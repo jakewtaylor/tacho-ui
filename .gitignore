@@ -18,3 +18,7 @@ output.err
 *.swp
 *.swo
 Thumbs.db
+
+# Workspace artefacts
+node_modules/
+.turbo/

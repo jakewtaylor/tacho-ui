@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import { Link, useRouteLoaderData } from "react-router-dom";
 import { CheckCircle2, Printer, ShieldAlert } from "lucide-react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@tacholens/ui/alert";
+import { Badge } from "@tacholens/ui/badge";
+import { Button } from "@tacholens/ui/button";
 import {
   Card,
   CardAction,
@@ -12,14 +12,14 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@tacholens/ui/card";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "@/components/ui/empty";
-import { cn } from "@/lib/utils";
+} from "@tacholens/ui/empty";
+import { cn } from "@tacholens/ui/utils";
 import {
   computeDailyStats,
   formatHours,
