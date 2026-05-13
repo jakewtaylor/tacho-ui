@@ -60,8 +60,17 @@ jobs:
         run: npm ci
 
       # -- Test gates -----------------------------------------------------
+      # The frontend has to build before Go tests because main.go uses
+      # //go:embed all:frontend/dist — that path must exist (even empty
+      # would do for embedding purposes, but a real build catches typos).
+      - name: Build frontend (for go:embed)
+        working-directory: frontend
+        run: npm run build
+
       - name: Go tests
-        run: go test ./...
+        # Exclude frontend/... because node_modules/flatted ships a stray
+        # Go file that pollutes `./...` matches.
+        run: go test $(go list ./... | grep -v '/frontend/')
 
       - name: Frontend typecheck
         working-directory: frontend
