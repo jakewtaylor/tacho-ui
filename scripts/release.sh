@@ -103,6 +103,19 @@ wails build -platform darwin/universal -trimpath -clean -skipbindings \
     -tags sparkle \
     -ldflags "-X main.Version=$VERSION"
 
+# -- crisp app icon -----------------------------------------------------------
+
+# Wails generated iconfile.icns by downsampling build/appicon.png. Replace it
+# (and the .ddd document icon) with a hand-tuned multi-resolution .icns built
+# by iconutil from the per-size PNGs in icons/. Must happen before codesign,
+# which seals Contents/Resources/.
+echo
+echo "==> swapping in hand-tuned .icns"
+"$REPO_ROOT/scripts/build-icns.sh"
+RESOURCES_DIR="$APP_PATH/Contents/Resources"
+cp -f "$REPO_ROOT/build/darwin/appicon.icns" "$RESOURCES_DIR/iconfile.icns"
+cp -f "$REPO_ROOT/build/darwin/appicon.icns" "$RESOURCES_DIR/dddFileIcon.icns"
+
 # -- embed Sparkle.framework --------------------------------------------------
 
 echo
