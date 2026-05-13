@@ -1,12 +1,8 @@
 import * as React from "react";
 import { NavLink, useLocation, useParams } from "react-router-dom";
-import {
-  CalendarRange,
-  GaugeCircle,
-  IdCard,
-  Upload,
-  Users,
-} from "lucide-react";
+import { CalendarRange, IdCard, Upload, Users } from "lucide-react";
+
+import appIcon from "../src/assets/images/appicon.png";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -56,9 +52,12 @@ export function AppSidebar({
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="grid size-7 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-            <GaugeCircle className="size-4" />
-          </div>
+          <img
+            src={appIcon}
+            alt=""
+            aria-hidden
+            className="size-12 rounded-md"
+          />
           <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
             <span className="truncate font-semibold">Tachograph</span>
             <span className="truncate text-xs text-muted-foreground">
