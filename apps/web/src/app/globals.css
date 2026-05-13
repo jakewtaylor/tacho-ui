@@ -1,9 +1,2 @@
 @import "tailwindcss";
 @import "@tacholens/ui/styles/theme.css";
-
-/* Web-specific type stack — Geist via next/font/google sets up the CSS
- * variables; we plumb them into the shared theme's font slots. */
-@theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
