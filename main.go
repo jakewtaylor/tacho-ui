@@ -58,7 +58,7 @@ func main() {
 		// this is mostly for Windows + the command-line `tacho-ui foo.ddd`
 		// case on any platform.
 		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "tacho-ui.jake-taylor.file-association",
+			UniqueId: "com.tacholens.app.file-association",
 			OnSecondInstanceLaunch: func(data options.SecondInstanceData) {
 				app.handleOpenedFiles(filterDDDPaths(data.Args))
 			},

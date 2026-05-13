@@ -62,8 +62,10 @@ see `scripts/release.sh` and the GitHub Actions workflow at
 - `scripts/` — release pipeline.
 - `docs/appcast.xml` — Sparkle update feed, regenerated on every release.
 
-## A note on the bundle id
+## A note on identifiers
 
-The macOS bundle identifier and Go module name are still `tacho-ui` —
-that's the historical internal identifier. The product display name is
-TachoLens.
+The product display name is **TachoLens** and the macOS bundle
+identifier is `com.tacholens.app`. The Go module name and the on-disk
+SQLite directory (`~/Library/Application Support/tacho-ui/`) are still
+`tacho-ui` — that's the historical internal identifier, kept as-is to
+avoid breaking existing user data.
