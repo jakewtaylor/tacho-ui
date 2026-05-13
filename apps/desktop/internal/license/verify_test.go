@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,8 +92,18 @@ func TestVerifyHappyPath(t *testing.T) {
 func TestVerifyRejectsTamperedSignature(t *testing.T) {
 	priv := withTestKey(t)
 	token := signTestJWT(t, priv, baseClaims())
-	// Flip the last char of the signature.
-	tampered := token[:len(token)-1] + flipChar(token[len(token)-1:])
+	// Flip a char in the middle of the signature. The last char of a
+	// base64url-encoded Ed25519 signature carries 4 unused padding bits;
+	// flipping just those decodes to the same bytes and verification
+	// still passes — so the mutation has to land somewhere meaningful.
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("expected 3 JWT parts, got %d", len(parts))
+	}
+	sig := parts[2]
+	mid := len(sig) / 2
+	parts[2] = sig[:mid] + flipChar(sig[mid:mid+1]) + sig[mid+1:]
+	tampered := strings.Join(parts, ".")
 	if _, err := Verify(tampered); err == nil {
 		t.Fatalf("expected verification to fail on tampered token")
 	}
