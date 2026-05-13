@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@tacholens/ui/components/card";
+import { DisclaimerBanner } from "../components/DisclaimerBanner";
 import {
   Empty,
   EmptyDescription,
@@ -108,6 +109,7 @@ export function DayPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <DisclaimerBanner />
       <Card>
         <CardHeader className="border-b">
           <div className="flex items-center justify-between gap-2">

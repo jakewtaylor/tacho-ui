@@ -133,7 +133,7 @@ export function PrintMini() {
       </div>
       <div className="flex justify-between mt-1 text-ink-3">
         <span>tot drive 38h 54m</span>
-        <span className="text-[var(--breach)]">1 breach</span>
+        <span className="text-[var(--breach)]">1 flag · review</span>
       </div>
     </div>
   );

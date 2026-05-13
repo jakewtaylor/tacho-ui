@@ -21,7 +21,7 @@ export const steps: Step[] = [
   {
     n: "03",
     title: "Read your weeks at a glance",
-    body: "Per-day breakdown of driving, work, available time, and rest, with EU 561 infringements surfaced inline. Weekly reports print cleanly to A4 for the compliance folder.",
-    mono: "from card to clarity in seconds",
+    body: "Per-day breakdown of driving, work, available time, and rest. Patterns that may point to EU 561/2006 issues are flagged for you to review against the regulation and your raw records. Weekly summaries print cleanly to A4.",
+    mono: "first-look summaries you verify",
   },
 ];

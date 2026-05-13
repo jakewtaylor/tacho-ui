@@ -17,22 +17,23 @@ export function Features() {
           </h2>
           <p className="mt-4 text-[15px] leading-relaxed text-ink-2 max-w-md">
             Not a generic data viewer. Every panel is shaped by the EU 165/2014
-            activity model, the EU 561/2006 rules engine, and the quirks of
-            Gen-1 and Gen-2 driver cards.
+            activity model, EU 561/2006 reference rules, and the quirks of
+            Gen-1 and Gen-2 driver cards — surfaced as a starting point for
+            your own review, not as a compliance determination.
           </p>
         </div>
 
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-px bg-hairline border border-hairline-strong rounded-xl overflow-hidden">
           <FeatureCard
-            title="Rules engine, not a checklist"
-            mono="every breach explained"
-            body="Continuous drive, 15+30 split breaks, daily and weekly limits, weekly rest, reduced-rest budgets, extension days. Each detection cites the article of the regulation it&apos;s reading."
+            title="Rule patterns, with references"
+            mono="every flag cites its article"
+            body="Continuous drive, 15+30 split breaks, daily and weekly limits, weekly rest, reduced-rest budgets, extension days. Each finding cites the article of the regulation it&apos;s reading so you can verify it yourself."
             visual={<MonthSparklineBars />}
           />
           <FeatureCard
             title="Minute-accurate day timeline"
             mono="see exactly when, exactly how long"
-            body="A 24-hour view of every shift. Driving, work, available, and rest minutes placed against the clock. Qualifying breaks highlighted; breaches called out in context."
+            body="A 24-hour view of every shift. Driving, work, available, and rest minutes placed against the clock. Qualifying breaks highlighted; potential issues called out in context."
             visual={<DayTimelineMini />}
           />
           <FeatureCard
@@ -42,9 +43,9 @@ export function Features() {
             visual={<RouteMini />}
           />
           <FeatureCard
-            title="Printable A4 weekly reports"
-            mono="DVSA-ready, save as PDF"
-            body="A clean spreadsheet-style layout for the compliance folder. Print or save to PDF straight from the macOS print dialog. Attach to your records, hand to the inspector."
+            title="Printable A4 weekly summaries"
+            mono="save as PDF"
+            body="A clean spreadsheet-style layout for your own records. Print or save to PDF straight from the macOS print dialog. File alongside your manual compliance checks."
             visual={<PrintMini />}
           />
         </div>

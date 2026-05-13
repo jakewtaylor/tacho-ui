@@ -6,7 +6,7 @@ export function HowItWorks() {
       <div className="max-w-[1200px] mx-auto px-6 py-16">
         <div className="eyebrow">how it works</div>
         <h2 className="font-heading text-[32px] font-semibold tracking-tight text-ink mt-2 max-w-2xl">
-          A driver card to a compliance picture in under five seconds.
+          From driver card to a first look at the week in under five seconds.
         </h2>
         <ol className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-px bg-hairline border border-hairline-strong rounded-lg overflow-hidden">
           {steps.map((s) => (

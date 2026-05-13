@@ -19,8 +19,8 @@ export default function BuySuccessPage() {
         </p>
         <p className="mt-4 text-[14px] text-ink-3 leading-relaxed">
           Can&apos;t find it? Check spam. If it&apos;s still not there, email{" "}
-          <a className="underline" href="mailto:hello@tacholens.com">
-            hello@tacholens.com
+          <a className="underline" href="mailto:support@tacholens.com">
+            support@tacholens.com
           </a>{" "}
           and we&apos;ll resend.
         </p>

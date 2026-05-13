@@ -5,6 +5,7 @@ import { CheckCircle2, Printer, ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@tacholens/ui/components/alert";
 import { Badge } from "@tacholens/ui/components/badge";
 import { Button } from "@tacholens/ui/components/button";
+import { DisclaimerBanner } from "../components/DisclaimerBanner";
 import {
   Card,
   CardAction,
@@ -134,6 +135,8 @@ export function WeeksPage() {
         </p>
       </div>
 
+      <DisclaimerBanner />
+
       <ComplianceHeadline counts={totalCounts} weeks={weeks.length} />
 
       <div className="flex flex-col gap-3">
@@ -171,10 +174,11 @@ function ComplianceHeadline({
       <Alert className="border-emerald-500/40 bg-emerald-500/5">
         <CheckCircle2 className="text-emerald-400" />
         <AlertTitle className="text-emerald-300">
-          Compliant across {weeks} week{weeks === 1 ? "" : "s"}
+          Nothing flagged in {weeks} week{weeks === 1 ? "" : "s"}
         </AlertTitle>
         <AlertDescription>
-          No driver-hours infringements detected on the card.
+          No EU 561/2006 patterns flagged on the card. Confirm against the
+          raw activity before relying on this summary.
         </AlertDescription>
       </Alert>
     );
@@ -191,8 +195,9 @@ function ComplianceHeadline({
         {weeks === 1 ? "" : "s"}
       </AlertTitle>
       <AlertDescription>
-        See per-week breakdowns below for the rule, date, and quantity behind
-        each entry.
+        Pattern matches for your review — see per-week breakdowns below.
+        Verify each item against the raw activity and the regulation before
+        acting.
       </AlertDescription>
     </Alert>
   );

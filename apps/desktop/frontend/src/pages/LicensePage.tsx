@@ -169,6 +169,16 @@ export function LicensePage() {
               <code className="font-mono">TLX-XXXX-XXXX-XXXX-XXXX</code>.
             </CardDescription>
           </CardHeader>
+          <CardContent className="-mt-2 text-xs text-muted-foreground">
+            Lost your key or stuck on activation? Email{" "}
+            <a
+              href="mailto:support@tacholens.com?subject=TachoLens%20license"
+              className="underline hover:text-foreground"
+            >
+              support@tacholens.com
+            </a>
+            .
+          </CardContent>
           <form onSubmit={onActivate}>
             <CardContent className="space-y-3">
               <Label htmlFor="key">License key</Label>

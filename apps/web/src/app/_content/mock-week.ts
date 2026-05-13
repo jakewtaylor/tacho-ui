@@ -1,7 +1,7 @@
 /**
- * Sample week data for the marketing-site hero. Shape mirrors what
- * apps/desktop/frontend/src/activity.ts computes per day, compressed to
- * hours for the chart.
+ * Sample data for the marketing-site hero. Mirrors what
+ * apps/desktop/frontend/src/activity.ts computes per day, compressed
+ * to hours for the chart.
  */
 
 export type MockDay = {
@@ -15,109 +15,36 @@ export type MockDay = {
   breach: boolean;
 };
 
-export const mockWeek: MockDay[] = [
-  {
-    day: "Mon",
-    date: "10 May",
-    driving: 8.2,
-    work: 1.1,
-    available: 0.4,
-    rest: 14.3,
-    ext: false,
-    breach: false,
-  },
-  {
-    day: "Tue",
-    date: "11 May",
-    driving: 9.4,
-    work: 1.7,
-    available: 0.3,
-    rest: 11.4,
-    ext: true,
-    breach: false,
-  },
-  {
-    day: "Wed",
-    date: "12 May",
-    driving: 4.6,
-    work: 2.1,
-    available: 0.2,
-    rest: 17.1,
-    ext: false,
-    breach: false,
-  },
-  {
-    day: "Thu",
-    date: "13 May",
-    driving: 9.9,
-    work: 1.4,
-    available: 0.8,
-    rest: 10.2,
-    ext: true,
-    breach: false,
-  },
-  {
-    day: "Fri",
-    date: "14 May",
-    driving: 4.7,
-    work: 2.6,
-    available: 0.4,
-    rest: 9.7,
-    ext: false,
-    breach: true,
-  },
-  {
-    day: "Sat",
-    date: "15 May",
-    driving: 2.1,
-    work: 0.9,
-    available: 0.2,
-    rest: 20.8,
-    ext: false,
-    breach: false,
-  },
-  {
-    day: "Sun",
-    date: "16 May",
-    driving: 0.0,
-    work: 0.0,
-    available: 0.0,
-    rest: 24.0,
-    ext: false,
-    breach: false,
-  },
-];
-
-export type MockInfringement = {
-  code: string;
-  severity: "breach" | "info";
-  title: string;
-  desc: string;
-  rule: string;
-};
-
-export const mockInfringements: MockInfringement[] = [
-  {
-    code: "DAILY_REST_INSUFFICIENT",
-    severity: "breach",
-    title: "Daily rest below 9 h",
-    desc: "Rest period 9 h 42 m measured before 14 May shift — below the 11 h daily rest required by EU 561/2006 Art. 8(2).",
-    rule: "EU 561/2006 · Art. 8(2)",
-  },
-  {
-    code: "EXTENSION_USED",
-    severity: "info",
-    title: "2 extension days used this week",
-    desc: "Driving extended to 9–10 h on Tue 11 May and Thu 13 May — the regulation permits two such days per week.",
-    rule: "EU 561/2006 · Art. 6(1)",
-  },
-];
-
 /** 28-day driving series for the rules-engine sparkline (hours per day). */
 export const monthSeries: number[] = [
   3.2, 4.1, 8.6, 9.1, 7.4, 6.8, 0.4, 5.9, 8.8, 9.6, 7.2, 4.4, 2.1, 0.0, 8.2,
   9.4, 4.6, 9.9, 4.7, 2.1, 0.0, 6.1, 7.5, 8.2, 9.3, 6.6, 3.4, 0.5,
 ];
+
+/**
+ * 28-day stacked series used by the hero's Daily-activity chart, mirroring
+ * what the desktop's Overview page shows in ActivityPanel. Each row's driving
+ * value comes from monthSeries; work/available/rest are plausible companions.
+ * MockDay.ext and .breach are used only by other marketing components.
+ */
+export const mockMonth: MockDay[] = monthSeries.map((driving, i) => {
+  const work = driving === 0 ? 0 : Math.min(2.5, 0.6 + (i % 5) * 0.35);
+  const available = driving === 0 ? 0 : 0.2 + ((i % 3) * 0.15);
+  const active = driving + work + available;
+  const rest = Math.max(0, 24 - active);
+  const start = new Date(Date.UTC(2026, 3, 16)); // 2026-04-16
+  start.setUTCDate(start.getUTCDate() + i);
+  return {
+    day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][start.getUTCDay()]!,
+    date: start.toISOString().slice(0, 10),
+    driving: Number(driving.toFixed(1)),
+    work: Number(work.toFixed(1)),
+    available: Number(available.toFixed(1)),
+    rest: Number(rest.toFixed(1)),
+    ext: driving > 9,
+    breach: driving > 10,
+  };
+});
 
 /** Mini route polyline + stops for the GNSS card. Coords are canvas units. */
 export const routePoints: ReadonlyArray<readonly [number, number]> = [

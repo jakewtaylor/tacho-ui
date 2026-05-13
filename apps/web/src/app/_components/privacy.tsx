@@ -1,7 +1,7 @@
 const dataPoints: { key: string; value: string }[] = [
   { key: "Stays on your Mac", value: "no cloud, no upload" },
   { key: "No analytics", value: "no telemetry of any kind" },
-  { key: "Open-source", value: "Apache-2.0 licence" },
+  { key: "Code-signed", value: "Apple Developer ID, notarised" },
   { key: "Auto-update", value: "cryptographically signed" },
 ];
 

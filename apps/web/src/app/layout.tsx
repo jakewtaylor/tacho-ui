@@ -3,7 +3,7 @@ import "./globals.css";
 
 const title = "TachoLens — see your tacho data clearly";
 const description =
-  "A local-first macOS app for EU driver-card tachograph downloads. Driving sessions, breaks, weekly summaries, and EU 561/2006 compliance — without uploading anything anywhere.";
+  "A local-first macOS app for EU driver-card tachograph downloads. Get a first-look summary of driving sessions, breaks, and weekly totals — patterns to review yourself, not a compliance verdict. Nothing leaves your Mac.";
 
 export const metadata: Metadata = {
   title,

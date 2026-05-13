@@ -254,11 +254,18 @@ export function PrintWeekPage() {
           </div>
         </section>
 
+        <section className="print-disclaimer">
+          <strong>For review only.</strong> Findings below are pattern matches
+          against EU 561/2006 reference rules. Verify each item against the
+          raw activity and the regulation before acting. This summary is not
+          a compliance determination.
+        </section>
+
         <section className="print-infringements">
-          <h2>Infringements ({infringements.length})</h2>
+          <h2>Items flagged for review ({infringements.length})</h2>
           {infringements.length === 0 ? (
             <p className="print-compliant">
-              ✓ No infringements detected for this week.
+              ✓ No EU 561/2006 patterns flagged this week — confirm manually.
             </p>
           ) : (
             <ol>

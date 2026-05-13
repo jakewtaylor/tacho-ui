@@ -6,15 +6,21 @@ export function RulesTable() {
       <div className="max-w-[1200px] mx-auto px-6 py-20">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-10 items-start">
           <div>
-            <div className="eyebrow">eu 561/2006 · coverage</div>
+            <div className="eyebrow">eu 561/2006 · reference rules</div>
             <h2 className="font-heading text-[32px] font-semibold tracking-tight text-ink mt-2 leading-tight">
-              Twelve compliance rules, surfaced where they matter.
+              Twelve rule patterns, surfaced for your review.
             </h2>
             <p className="mt-4 text-[15px] leading-relaxed text-ink-2 max-w-md">
               Detection is pure-function. Every rule is its own predicate with
-              a code, a severity, a regulation reference, and a unit test. No
-              cloud round-trip, no black box.
+              a code, a severity hint, a regulation reference, and a unit
+              test. No cloud round-trip, no black box.
             </p>
+            <div className="mt-6 rounded-md border border-hairline-strong bg-paper px-3 py-2.5 text-[12px] leading-relaxed text-ink-2 max-w-md">
+              <strong className="text-ink">For your review only.</strong>{" "}
+              Findings are pattern matches against published rules, not legal
+              advice or a compliance determination. Always verify against the
+              raw card data and the regulation itself before acting.
+            </div>
             <div className="mt-6 flex flex-col gap-1 font-mono text-[11px] text-ink-3">
               <LegendRow color="var(--breach)" label="breach — hard limit exceeded" />
               <LegendRow color="var(--available)" label="warning — caution / budget close" />

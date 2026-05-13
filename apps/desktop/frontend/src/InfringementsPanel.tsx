@@ -66,9 +66,12 @@ export function InfringementsPanel({
         <SectionTitle title={title} />
         <Alert className="border-emerald-500/40 bg-emerald-500/5">
           <CheckCircle2 className="text-emerald-400" />
-          <AlertTitle className="text-emerald-300">Compliant</AlertTitle>
+          <AlertTitle className="text-emerald-300">
+            Nothing flagged in this period
+          </AlertTitle>
           <AlertDescription>
-            No driver-hours infringements detected in this period.
+            No EU 561/2006 patterns matched. Confirm against the raw activity
+            before relying on this result.
           </AlertDescription>
         </Alert>
       </section>

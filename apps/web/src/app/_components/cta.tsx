@@ -1,19 +1,24 @@
 import { release } from "../_content/release";
+import { getPriceInfo } from "@/lib/price";
 
-export function CTA() {
+export async function CTA() {
+  const price = await getPriceInfo();
+  const priceChip = price
+    ? `${price.formatted} · 1 yr updates`
+    : "one-time · 1 yr updates";
   return (
     <section id="download" className="bg-ink text-white">
       <div className="max-w-[1200px] mx-auto px-6 py-20 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 items-center">
         <div>
           <div className="font-mono text-[11px] uppercase tracking-wider text-white/60">
-            free · code-signed · auto-updates
+            one-time purchase · code-signed · auto-updates
           </div>
           <h2 className="mt-2 font-heading text-[44px] font-semibold tracking-tight leading-[1.05]">
             Take your weeks back from the spreadsheet.
           </h2>
           <p className="mt-4 text-[16px] text-white/70 max-w-xl leading-relaxed">
             macOS 12 Monterey or later. Universal binary, {release.dmgSizeMb} MB.
-            Releases are tagged in GitHub Actions and notarised by Apple.
+            Code-signed by a Developer ID certificate and notarised by Apple.
           </p>
         </div>
         <div className="flex flex-col gap-3 lg:items-end">
@@ -24,12 +29,12 @@ export function CTA() {
             >
               Buy a license
               <span className="font-mono text-[12px] text-ink-3 border-l border-hairline pl-3">
-                one-time · 1 yr updates
+                {priceChip}
               </span>
             </button>
           </form>
           <a
-            href={release.latestReleaseUrl}
+            href="/api/download"
             className="inline-flex items-center gap-3 px-5 h-11 rounded-md border border-white/20 text-white text-[14px] font-medium hover:bg-white/5"
           >
             <AppleIcon />

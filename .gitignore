@@ -22,3 +22,5 @@ Thumbs.db
 # Workspace artefacts
 node_modules/
 .turbo/
+.next/
+next-env.d.ts

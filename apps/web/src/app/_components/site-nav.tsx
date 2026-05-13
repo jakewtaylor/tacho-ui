@@ -1,11 +1,12 @@
 import Image from "next/image";
+import Link from "next/link";
 import { release } from "../_content/release";
 
 export function SiteNav() {
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-paper/90 backdrop-blur">
       <div className="max-w-[1200px] mx-auto px-6 h-14 flex items-center gap-6">
-        <a href="#top" className="flex items-center gap-2.5">
+        <Link href="/#top" className="flex items-center gap-2.5">
           <Image
             src="/appicon.png"
             alt=""
@@ -17,37 +18,36 @@ export function SiteNav() {
           <span className="font-heading font-semibold text-ink tracking-tight">
             TachoLens
           </span>
-        </a>
+        </Link>
         <nav className="hidden md:flex items-center gap-5 text-[13px] text-ink-2 ml-2">
-          <a href="#features" className="hover:text-ink">
+          <Link href="/#features" className="hover:text-ink">
             Features
-          </a>
-          <a href="#rules" className="hover:text-ink">
-            Compliance
-          </a>
-          <a href="#privacy" className="hover:text-ink">
+          </Link>
+          <Link href="/#rules" className="hover:text-ink">
+            What it flags
+          </Link>
+          <Link href="/#privacy" className="hover:text-ink">
             Privacy
-          </a>
-          <a href="#changelog" className="hover:text-ink">
+          </Link>
+          <Link href="/#support" className="hover:text-ink">
+            Support
+          </Link>
+          <Link href="/changelog" className="hover:text-ink">
             Changelog
-          </a>
+          </Link>
         </nav>
         <div className="flex-1" />
-        <a
-          href={release.repoUrl}
-          className="hidden sm:inline-block text-[13px] text-ink-2 hover:text-ink"
-        >
-          GitHub ↗
-        </a>
-        <a
-          href="#download"
-          className="text-[13px] font-medium text-white px-3.5 h-9 inline-flex items-center rounded-md bg-ink hover:opacity-90"
-        >
-          Download
-          <span className="font-mono text-white/60 ml-2 text-[11px]">
-            {release.version}
-          </span>
-        </a>
+        <form action="/api/checkout" method="POST">
+          <button
+            type="submit"
+            className="text-[13px] font-medium text-white px-3.5 h-9 inline-flex items-center rounded-md bg-ink hover:opacity-90"
+          >
+            Buy
+            <span className="font-mono text-white/60 ml-2 text-[11px]">
+              {release.version}
+            </span>
+          </button>
+        </form>
       </div>
     </header>
   );
