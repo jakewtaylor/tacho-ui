@@ -106,3 +106,64 @@ func makeIdentificationBody() []byte {
 func putTimeReal(buf []byte, t time.Time) {
 	binary.BigEndian.PutUint32(buf, uint32(t.Unix()))
 }
+
+// TestParseCardMultipleEFs exercises the dispatcher with synthetic
+// Identification, Vehicles_Used, and Places EFs in a single stream and
+// confirms each lands in the right Card field for the right generation.
+func TestParseCardMultipleEFs(t *testing.T) {
+	// Identification Gen1.
+	idBody := makeIdentificationBody()
+	// Vehicles_Used Gen2 — 2-byte pointer + 3 × 31-byte Gen1 slots.
+	vehBody := makeVehiclesBody(t)
+	// Places Gen1 — 1-byte pointer + 3 × 10-byte slots.
+	placeBody := makePlacesBody(t)
+
+	stream := append([]byte(nil), tlvFrame(0x0520, 0x00, idBody)...)
+	stream = append(stream, tlvFrame(0x0505, 0x02, vehBody)...)
+	stream = append(stream, tlvFrame(0x0506, 0x00, placeBody)...)
+
+	c, err := ParseCard(stream)
+	if err != nil {
+		t.Fatalf("ParseCard: %v", err)
+	}
+	if c.Identification1 == nil {
+		t.Fatalf("Identification1 missing")
+	}
+	if c.VehiclesUsed2 == nil || len(c.VehiclesUsed2.CardVehicleRecords) == 0 {
+		t.Fatalf("VehiclesUsed2 not populated")
+	}
+	if c.PlaceDailyWorkPeriod1 == nil || len(c.PlaceDailyWorkPeriod1.PlaceRecords) == 0 {
+		t.Fatalf("PlaceDailyWorkPeriod1 not populated")
+	}
+}
+
+func makeVehiclesBody(t *testing.T) []byte {
+	t.Helper()
+	body := []byte{0x00, 0x00} // 2-byte pointer
+	// one populated 31-byte slot
+	slot := make([]byte, 31)
+	// 3-byte odometers, both 100000
+	slot[0], slot[1], slot[2] = 0x01, 0x86, 0xA0
+	slot[3], slot[4], slot[5] = 0x01, 0x86, 0xA0
+	binary.BigEndian.PutUint32(slot[6:10], uint32(time.Date(2026, 4, 1, 8, 0, 0, 0, time.UTC).Unix()))
+	binary.BigEndian.PutUint32(slot[10:14], uint32(time.Date(2026, 4, 1, 18, 0, 0, 0, time.UTC).Unix()))
+	slot[14] = 21
+	slot[15] = 0x01
+	for i := 16; i < 29; i++ {
+		slot[i] = 0x20
+	}
+	copy(slot[16:], "AB12 CDE")
+	return append(body, slot...)
+}
+
+func makePlacesBody(t *testing.T) []byte {
+	t.Helper()
+	body := []byte{0x00} // 1-byte pointer
+	slot := make([]byte, 10)
+	binary.BigEndian.PutUint32(slot[0:4], uint32(time.Date(2026, 4, 1, 8, 0, 0, 0, time.UTC).Unix()))
+	slot[4] = 0
+	slot[5] = 21
+	slot[6] = 0
+	slot[7], slot[8], slot[9] = 0x01, 0x86, 0xA0
+	return append(body, slot...)
+}
