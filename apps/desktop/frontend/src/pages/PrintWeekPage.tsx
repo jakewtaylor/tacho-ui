@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, Navigate, useLoaderData, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
 
-import { Button } from "@tacholens/ui/button";
+import { Button } from "@tacholens/ui/components/button";
 import {
   computeDailyStats,
   computeDayDetail,

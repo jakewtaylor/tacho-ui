@@ -5,7 +5,7 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "src/styles/globals.css",
+    "css": "../../../packages/ui/src/styles/globals.css",
     "baseColor": "taupe",
     "cssVariables": true,
     "prefix": ""
@@ -13,11 +13,11 @@
   "iconLibrary": "lucide",
   "rtl": false,
   "aliases": {
-    "components": "@tacholens/ui/components",
+    "components": "@/components",
     "utils": "@tacholens/ui/lib/utils",
     "ui": "@tacholens/ui/components",
-    "lib": "@tacholens/ui/lib",
-    "hooks": "@tacholens/ui/hooks"
+    "lib": "@/lib",
+    "hooks": "@/hooks"
   },
   "menuColor": "inverted",
   "menuAccent": "subtle",

@@ -14,14 +14,14 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@tacholens/ui/card";
+} from "@tacholens/ui/components/card";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@tacholens/ui/empty";
+} from "@tacholens/ui/components/empty";
 import { type GnssPoint } from "./gnss";
 
 const HEIGHT = 420;

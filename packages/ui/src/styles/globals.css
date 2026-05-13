@@ -1,10 +1,17 @@
-/* shadcn theme tokens + brand type stack for TachoLens apps.
+/* Shared TachoLens stylesheet.
  *
- * Imported by each consumer's main stylesheet (e.g. apps/desktop/frontend/src/style.css,
- * apps/web/src/app/globals.css). The consumer is responsible for the Tailwind
- * @import itself; this file adds the @theme block, design tokens, dark-mode
- * variant, base resets, and the brand fonts.
+ * Both apps consume this single file:
+ *   - apps/desktop/frontend/src/main.tsx → `import "@tacholens/ui/globals.css"`
+ *   - apps/web/src/app/layout.tsx        → `import "@tacholens/ui/globals.css"`
+ *
+ * Tailwind + tw-animate-css + the shadcn defaults are set up here so each
+ * consumer's bundler doesn't have to repeat the boilerplate. Apps may add
+ * their own per-app stylesheet on top for domain-specific styles.
  */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 /* Brand fonts. @fontsource packages ship @font-face declarations + the
  * variable font files. Both Vite (desktop) and Next.js (web) resolve CSS
@@ -12,10 +19,14 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/dm-sans";
 
-/* Make Tailwind scan our component source. @source paths are resolved
- * relative to THIS file, so this works regardless of where the consumer's
- * style.css sits on disk. */
+/* Make Tailwind scan our component source AND each consumer app's source.
+ * @source paths resolve relative to THIS file. The apps/* lines are
+ * explicit so utility classes used in app components are emitted even when
+ * Tailwind's crawl starts from the shared package's CSS. */
 @source "..";
+@source "../../../../apps/desktop/frontend/src";
+@source "../../../../apps/desktop/frontend/components";
+@source "../../../../apps/web/src";
 
 @custom-variant dark (&:is(.dark *));
 

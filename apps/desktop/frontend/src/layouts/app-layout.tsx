@@ -25,7 +25,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@tacholens/ui/alert-dialog";
+} from "@tacholens/ui/components/alert-dialog";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -33,14 +33,14 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@tacholens/ui/breadcrumb";
-import { Card, CardDescription, CardTitle } from "@tacholens/ui/card";
-import { Separator } from "@tacholens/ui/separator";
+} from "@tacholens/ui/components/breadcrumb";
+import { Card, CardDescription, CardTitle } from "@tacholens/ui/components/card";
+import { Separator } from "@tacholens/ui/components/separator";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@tacholens/ui/sidebar";
+} from "@tacholens/ui/components/sidebar";
 import { PendingFileOpens } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import type { db } from "../../wailsjs/go/models";

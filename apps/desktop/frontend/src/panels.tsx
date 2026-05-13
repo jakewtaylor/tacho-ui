@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { TriangleAlert } from "lucide-react";
 
-import { Badge } from "@tacholens/ui/badge";
+import { Badge } from "@tacholens/ui/components/badge";
 import {
   Card,
   CardAction,
@@ -11,7 +11,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@tacholens/ui/card";
+} from "@tacholens/ui/components/card";
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@tacholens/ui/table";
+} from "@tacholens/ui/components/table";
 import {
   computeDailyStats,
   formatHours,

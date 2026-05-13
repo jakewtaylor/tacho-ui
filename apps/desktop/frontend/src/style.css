@@ -1,11 +1,11 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@tacholens/ui/styles/theme.css";
+/* Desktop-specific styles. Tailwind, shadcn, fonts, and the design tokens
+ * all come from @tacholens/ui/globals.css (imported once in main.tsx).
+ * Anything here is unique to the desktop app: the EU 165/2014 work-type
+ * semantic palette, the loader-slide animation, and the printable weekly
+ * report. */
 
 :root {
-  /* Domain palette — semantic per EU 165/2014 work_type. App-specific;
-   * not part of the shared shadcn theme. */
+  /* Domain palette — semantic per EU 165/2014 work_type. */
   --color-driving: oklch(0.78 0.18 145);
   --color-work: oklch(0.72 0.14 250);
   --color-available: oklch(0.82 0.16 80);

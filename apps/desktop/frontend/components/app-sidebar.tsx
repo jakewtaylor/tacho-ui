@@ -4,7 +4,7 @@ import { CalendarRange, IdCard, Upload, Users } from "lucide-react";
 
 import appIcon from "../src/assets/images/appicon.png";
 
-import { Button } from "@tacholens/ui/button";
+import { Button } from "@tacholens/ui/components/button";
 import {
   Sidebar,
   SidebarContent,
@@ -18,8 +18,8 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
-} from "@tacholens/ui/sidebar";
-import { Skeleton } from "@tacholens/ui/skeleton";
+} from "@tacholens/ui/components/sidebar";
+import { Skeleton } from "@tacholens/ui/components/skeleton";
 import type { db } from "../wailsjs/go/models";
 
 type Props = React.ComponentProps<typeof Sidebar> & {

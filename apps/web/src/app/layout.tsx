@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import "@tacholens/ui/globals.css";
 
 export const metadata: Metadata = {
   title: "TachoLens — see your tacho data clearly",
