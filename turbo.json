@@ -1,21 +1,38 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
+  "globalDependencies": [
+    "package.json",
+    "turbo.json",
+    ".gitignore"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": [
+        "VITE_GOOGLE_MAPS_API_KEY",
+        "VITE_GOOGLE_MAPS_MAP_ID",
+        "NEXT_PUBLIC_*"
+      ],
+      "outputLogs": "new-only"
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
-    "lint": {},
+    "lint": {
+      "outputs": []
+    },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "outputLogs": "new-only"
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "outputLogs": "new-only"
     },
     "format": {
       "cache": false
