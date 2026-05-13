@@ -91,10 +91,19 @@ func dispatchCardEF(c *Card, rec tlv.Record) error {
 		}
 		setDriverActivity(c, gen, driverActivityToCardData(records))
 
-	case card.FIDGNSSPlaces, card.FIDGNSSPlacesAuth:
-		// GNSS decoders land alongside signature verification in a
-		// follow-up — the GeoCoordinate scaling needs validation
-		// against a real Gen2 card before we commit.
+	case card.FIDGNSSPlaces:
+		records, err := card.DecodeGnss(rec.Value)
+		if err != nil {
+			return fmt.Errorf("EF_GNSS_Places (gen %d): %w", gen, err)
+		}
+		c.GnssAccumulated = gnssToCardData(records, false)
+
+	case card.FIDGNSSPlacesAuth:
+		records, err := card.DecodeGnss(rec.Value)
+		if err != nil {
+			return fmt.Errorf("EF_GNSS_PlacesAuth (gen %d): %w", gen, err)
+		}
+		c.GnssAuthAccumulated = gnssToCardData(records, true)
 
 	default:
 		// Decoder not yet implemented or EF not part of the driver-card
@@ -269,6 +278,32 @@ func eventsToCardData(records []card.EventOrFaultRecord, isEvent bool) *EventOrF
 		out.CardEventRecordsArray = []EventOrFaultBucket{bucket}
 	} else {
 		out.CardFaultRecordsArray = []EventOrFaultBucket{bucket}
+	}
+	return out
+}
+
+// gnssToCardData lifts decoded GNSS samples into the JSON-shaped
+// GnssData. The isAuth flag selects which slice (auth vs accumulated)
+// the records populate — both are exposed for upstream compatibility.
+func gnssToCardData(records []card.GnssRecord, isAuth bool) *GnssData {
+	out := &GnssData{}
+	dst := make([]GnssRecord, 0, len(records))
+	for _, r := range records {
+		dst = append(dst, GnssRecord{
+			TimeStamp:            r.TimeStamp,
+			VehicleOdometerValue: r.Odometer,
+			GnssPlaceRecord: &GnssPlaceRecord{
+				GeoCoordinates: &GeoCoordinates{
+					Latitude:  r.Latitude,
+					Longitude: r.Longitude,
+				},
+			},
+		})
+	}
+	if isAuth {
+		out.GnssAuthAccumulatedDrivingRecords = dst
+	} else {
+		out.GnssAccumulatedDrivingRecords = dst
 	}
 	return out
 }
