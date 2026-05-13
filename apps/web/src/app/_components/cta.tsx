@@ -17,14 +17,25 @@ export function CTA() {
           </p>
         </div>
         <div className="flex flex-col gap-3 lg:items-end">
+          <form action="/api/checkout" method="POST">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-3 px-6 h-14 rounded-md bg-white text-ink text-[16px] font-medium hover:bg-white/90"
+            >
+              Buy a license
+              <span className="font-mono text-[12px] text-ink-3 border-l border-hairline pl-3">
+                one-time · 1 yr updates
+              </span>
+            </button>
+          </form>
           <a
             href={release.latestReleaseUrl}
-            className="inline-flex items-center gap-3 px-6 h-14 rounded-md bg-white text-ink text-[16px] font-medium hover:bg-white/90"
+            className="inline-flex items-center gap-3 px-5 h-11 rounded-md border border-white/20 text-white text-[14px] font-medium hover:bg-white/5"
           >
             <AppleIcon />
             Download {release.version}
-            <span className="font-mono text-[12px] text-ink-3 border-l border-hairline pl-3">
-              .dmg · {release.dmgSizeMb} MB
+            <span className="font-mono text-[11px] text-white/40 border-l border-white/15 pl-3">
+              .dmg · {release.dmgSizeMb} MB · trial mode
             </span>
           </a>
           <div className="font-mono text-[10px] text-white/40 lg:text-right">

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { NavLink, useLocation, useParams } from "react-router-dom";
-import { CalendarRange, IdCard, Upload, Users } from "lucide-react";
+import { CalendarRange, IdCard, KeyRound, Upload, Users } from "lucide-react";
 
 import appIcon from "../src/assets/images/appicon.png";
 
@@ -92,6 +92,18 @@ export function AppSidebar({
                   <NavLink to="/" end>
                     <Users />
                     <span>Drivers</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/license"}
+                  tooltip="License"
+                >
+                  <NavLink to="/license">
+                    <KeyRound />
+                    <span>License</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

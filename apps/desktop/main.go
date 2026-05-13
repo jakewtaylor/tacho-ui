@@ -23,6 +23,12 @@ var assets embed.FS
 // const is for in-app display / logging.
 var Version = "dev"
 
+// BuildDate is the YYYY-MM-DD this binary was built on, baked at release
+// time via -ldflags "-X main.BuildDate=2026-05-13". The license server
+// rejects activation if BuildDate is after a license's update window. Dev
+// builds leave this empty; the license package treats empty as "today".
+var BuildDate = ""
+
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()

@@ -7,7 +7,7 @@ A desktop tachograph file viewer. Drop a `.ddd` file in, see the contents.
 This is a monorepo. Two packages under `apps/`:
 
 - `apps/desktop/` — the Wails v2 macOS app (Go backend + React-TS frontend). Go module `tacho-ui`. Everything below — `app.go`, `internal/`, `frontend/`, `build/`, `wails.json`, `scripts/release.sh` etc. — is relative to this directory unless stated otherwise.
-- `apps/web/` — the marketing landing page at tacholens.com. Next.js 16 (App Router) + Tailwind 4. Deploys to Vercel; Root Directory must be set to `apps/web` in the project settings.
+- `apps/web/` — the marketing landing page at tacholens.com **and the licensing backend** (Stripe checkout + webhook, license issuance, activation/heartbeat APIs, Neon Postgres). Next.js 16 (App Router) + Tailwind 4. Deploys to Vercel; Root Directory must be set to `apps/web` in the project settings.
 
 Shared at the monorepo root:
 
@@ -80,7 +80,14 @@ cd frontend && npm test
 # Web --------------------------------------------------------------
 cd apps/web
 npm run dev    # http://localhost:3000
-npm run build  # static export, Vercel-ready
+npm run build  # Next.js production build, Vercel-ready
+npm run db:push  # apply drizzle/*.sql to DATABASE_URL (Neon Postgres)
+npm run keys:gen # generate an Ed25519 keypair for signing license JWTs
+
+# Stripe webhook test (separate terminal, with `stripe` CLI installed + logged in)
+stripe listen --forward-to http://localhost:3000/api/stripe/webhook
+# → prints the local STRIPE_WEBHOOK_SECRET; paste into .env.local
+# Then trigger a test purchase from http://localhost:3000 with card 4242 4242 4242 4242
 
 # Standalone parser CLI (reference, at monorepo root)
 ./tachoparser/cmd/dddparser/dddparser -card < C_20260509_1146_M_TAYLOR_DB141641620128.ddd > output.json
@@ -104,6 +111,7 @@ Persistent desktop app: SQLite-backed store + import flow + driver-scoped pages.
 - `GetDriverProfile(cardNumber)` — full identity + aggregates.
 - `GetDailyRecords(cardNumber)`, `GetPlaceRecords(cardNumber)`, `GetGnssPoints(cardNumber)`, `GetEventsAndFaults(cardNumber)`, `GetDriverVehicles(cardNumber)` — typed row fetches.
 - `PrintWindow()` — native print dialog (via Wails PR #2822's `runtime.WindowPrint`).
+- `LicenseStatus()`, `ActivateLicense(key)`, `DeactivateLicense()` — see "Licensing" section below.
 
 ### Frontend layout
 
@@ -224,6 +232,51 @@ The sample card illustrates why the inconclusive verdict matters: only 1 verifie
 `app_test.go` contains a smoke test that loads the sample `.ddd`, parses it through the importer, and asserts driver name + card number match expected values. The test skips itself if the sample file isn't present. Run with `go test -v` from the repo root.
 
 `frontend/src/*.test.ts` covers the rules engine (activity / weeklyRest / infringements) via vitest. Run with `cd frontend && npm test`.
+
+## Licensing & payments
+
+The desktop app is paid: customers buy a license on tacholens.com via Stripe Checkout, receive the key by email (Resend), and paste it into the app. Unlicensed app runs in **trial mode** — `.ddd` files can still be imported and viewed, but the SQLite DB is in-memory (`file::memory:?cache=shared`) so nothing persists past quit. Licensed app uses the on-disk DB at `os.UserConfigDir()/tacho-ui/tacho.db`.
+
+### Web side (`apps/web/`)
+
+- **DB:** Neon Postgres + Drizzle ORM. Schema in `src/db/schema.ts` (tables: `licenses`, `activations`). Migrations live as plain SQL in `drizzle/0000_init.sql` — drizzle-kit is broken on Node 24 due to a package-exports clash with drizzle-orm 0.45+, so we apply migrations with the small `scripts/db-push.mjs` (`npm run db:push`). Schema is the source of truth in code; the SQL file mirrors it.
+- **Stripe:** `POST /api/checkout` creates a Stripe Checkout session (mode=payment, `price=STRIPE_PRICE_ID`) and 303s to Stripe's hosted page. `POST /api/stripe/webhook` listens for `checkout.session.completed`, generates a license key (`tlx-XXXX-XXXX-XXXX-XXXX`, Crockford base32), inserts a `licenses` row with `issued_at` and `update_window_expires_at = issued_at + 365d` (Sublime-style "1 year of updates"), and emails the key via Resend. Idempotent on `stripe_session_id`.
+- **License APIs:**
+  - `POST /api/license/activate` — `{license_key, machine_id, machine_name, app_build_date}`. Validates license, enforces `app_build_date <= update_window_expires_at` (403 if outside), upserts the activation (3-machine limit per license, 403 if exceeded), signs a 14-day Ed25519 JWT, returns it.
+  - `POST /api/license/heartbeat` — `{license_key, machine_id}`. Re-checks revocation, updates `last_seen_at`, returns a refreshed JWT. 410 if revoked.
+- **JWT signing:** Ed25519 via `jose`. Private key in env var `LICENSE_SIGNING_PRIVATE_KEY` (PEM, newlines escaped as `\n`). Generate a fresh keypair with `npm run keys:gen` — prints the env-var value and a Go string literal to paste into `apps/desktop/internal/license/public_key.go`.
+- **Pricing:** configured in the Stripe dashboard (one-time payment product); env var `STRIPE_PRICE_ID` references it. To change pricing, edit it in Stripe.
+- **Env vars** (see `.env.example`): `DATABASE_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `RESEND_API_KEY`, `LICENSE_FROM_EMAIL`, `LICENSE_SIGNING_PRIVATE_KEY`, `NEXT_PUBLIC_BASE_URL`. All must be set in Vercel for prod.
+
+### Desktop side (`apps/desktop/internal/license/`)
+
+- **`license.go`** — `State` owns the license file at `~/Library/Application Support/tacho-ui/license.json`. On startup it loads the file, verifies the JWT against the embedded Ed25519 public key, and either reports licensed or falls back to trial. Starts a weekly heartbeat goroutine.
+- **`verify.go`** — `Verify(token)` parses the JWT, checks issuer (`tacholens.com`), `exp`, and required claims. Returns typed `Claims`.
+- **`public_key.go`** — embedded Ed25519 SPKI public key (PEM). **Placeholder by default** — replace with `npm run keys:gen` output before the first release. The verifier panics with a clear error if you forget.
+- **`client.go`** — HTTP client for `/api/license/{activate,heartbeat}`. Base URL is `https://tacholens.com`; override at dev time with `TACHOLENS_API_URL=http://localhost:3000`. Returns typed `*APIError` so the UI can show the server's message verbatim.
+- **`machine_id.go`** (darwin only) — derives a stable per-machine ID as `sha256(IOPlatformUUID)` read via `ioreg`. Hashing keeps the raw UUID off the wire. Hostname is sent separately as the display name. Linux/Windows builds will need parallel files when those platforms ship.
+
+### Build date plumbing
+
+`main.BuildDate` is set at release time via `-ldflags "-X main.BuildDate=$(date -u +%Y-%m-%d)"` in `scripts/release.sh`. Empty / "dev" is treated as today by the license package so dev builds can still activate. The activate API uses this to enforce the 1-year update window.
+
+### Free tier (trial mode)
+
+Implemented entirely via the DB seam in `startup()`: `db.Open(ctx)` if licensed, `db.OpenInMemory(ctx)` if not (DSN `:memory:?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)` — WAL omitted because there's no disk to write a WAL file to). Migrations run against the in-memory DB on each launch (~ms). All 11 read/write bindings work identically — the only frontend awareness is the `<TrialBanner>` in `app-layout.tsx`, driven by `LicenseStatus()` in `layoutLoader`.
+
+After successful activation `ActivateLicense` calls `App.swapDB(true)`, which closes the in-memory DB and opens the on-disk one **live** — no app restart. `*sql.DB.Close` blocks on in-flight queries, so any bound method holding the old pointer through an `RLock` on `App.dbMu` finishes cleanly before the close completes. Imports made during the trial session are gone with the closed in-memory DB; the LicensePage toasts the user about this. Deactivation symmetrically calls `swapDB(false)`.
+
+### Action wiring
+
+License flows use the same React Router action/loader pattern as imports:
+
+- **Loader:** `layoutLoader()` fetches `{drivers, licenseStatus}` in parallel. Pages read `licenseStatus` via `useLayoutData()`.
+- **Actions:** `/license/activate` and `/license/deactivate` are resource routes in `main.tsx` that call `activateLicenseAction` / `deactivateLicenseAction` in `actions.ts`. `LicensePage` submits via `useFetcher`, and React Router automatically revalidates every loader when the fetcher returns — so the trial banner disappears + the page swaps to the "Licensed to …" card without any manual refetch.
+
+### Tests
+
+- `apps/desktop/internal/license/verify_test.go` — JWT round-trip, tampered-sig rejection, expired rejection, wrong-issuer rejection, missing-claim rejection.
+- `apps/web/` has no test setup yet; the JWT signing path is exercised end-to-end via the activate API in the local Stripe-CLI integration test (see "Running the pieces").
 
 ## Repository state
 

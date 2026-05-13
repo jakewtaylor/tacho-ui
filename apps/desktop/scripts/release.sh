@@ -100,9 +100,12 @@ wails generate module
 
 echo
 echo "==> wails build (universal, sparkle tag)"
+BUILD_DATE="$(date -u +%Y-%m-%d)"
+echo "→ build date:   $BUILD_DATE"
+
 wails build -platform darwin/universal -trimpath -clean -skipbindings \
     -tags sparkle \
-    -ldflags "-X main.Version=$VERSION"
+    -ldflags "-X main.Version=$VERSION -X main.BuildDate=$BUILD_DATE"
 
 # -- crisp app icon -----------------------------------------------------------
 

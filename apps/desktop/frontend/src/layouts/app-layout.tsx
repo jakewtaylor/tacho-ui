@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { TrialBanner } from "../components/TrialBanner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +35,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@tacholens/ui/components/breadcrumb";
-import { Card, CardDescription, CardTitle } from "@tacholens/ui/components/card";
+import {
+  Card,
+  CardDescription,
+  CardTitle,
+} from "@tacholens/ui/components/card";
 import { Separator } from "@tacholens/ui/components/separator";
 import {
   SidebarInset,
@@ -69,7 +74,7 @@ export function useLayoutData(): LayoutLoaderData {
 }
 
 export function AppLayout() {
-  const { drivers } = useLoaderData() as LayoutLoaderData;
+  const { drivers, licenseStatus } = useLoaderData() as LayoutLoaderData;
   const navigate = useNavigate();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
@@ -204,6 +209,7 @@ export function AppLayout() {
         <SidebarInset>
           <Topbar drivers={drivers} loading={isLoading} />
           <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+            {licenseStatus && !licenseStatus.licensed && <TrialBanner />}
             <Outlet context={ctx} />
           </main>
         </SidebarInset>
@@ -233,13 +239,11 @@ export function AppLayout() {
               <AlertDialogDescription asChild>
                 <div className="space-y-2">
                   <p>
-                    TachoLens was launched with a driver-card file.
-                    Import it into the database?
+                    TachoLens was launched with a driver-card file. Import it
+                    into the database?
                   </p>
                   <p className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
-                    {currentPendingPath
-                      ? basename(currentPendingPath)
-                      : ""}
+                    {currentPendingPath ? basename(currentPendingPath) : ""}
                   </p>
                 </div>
               </AlertDialogDescription>
@@ -274,7 +278,7 @@ function Topbar({
       <SidebarTrigger className="-ml-1" />
       <Separator
         orientation="vertical"
-        className="mr-2 data-[orientation=vertical]:h-4"
+        className="mr-2 data-vertical:h-4 data-vertical:my-auto"
       />
       <Breadcrumb>
         <BreadcrumbList>

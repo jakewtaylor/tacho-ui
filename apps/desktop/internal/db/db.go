@@ -50,10 +50,21 @@ func OpenAt(ctx context.Context, path string) (*DB, error) {
 	return openAt(ctx, path)
 }
 
+// OpenInMemory opens an ephemeral in-memory DB. Used by the desktop app's
+// trial mode: same migrations + same query surface, but everything vanishes
+// when the process exits. Skips the WAL pragma (no on-disk WAL to write).
+func OpenInMemory(ctx context.Context) (*DB, error) {
+	return openDSN(ctx, ":memory:?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)", ":memory:")
+}
+
 func openAt(ctx context.Context, path string) (*DB, error) {
 	// Pragmas: WAL for concurrent reads, FK enforcement on, busy timeout for
 	// transient contention. Set via DSN query so they apply per-connection.
 	dsn := path + "?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
+	return openDSN(ctx, dsn, path)
+}
+
+func openDSN(ctx context.Context, dsn, path string) (*DB, error) {
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite %s: %w", path, err)

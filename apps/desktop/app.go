@@ -14,6 +14,7 @@ import (
 
 	"tacho-ui/internal/db"
 	"tacho-ui/internal/importer"
+	"tacho-ui/internal/license"
 	"tacho-ui/internal/updater"
 )
 
@@ -27,7 +28,19 @@ const fileOpenedEvent = "file-opened"
 // the DB; the in-memory "parse JSON each open" path from the POC is gone.
 type App struct {
 	ctx context.Context
-	db  *db.DB
+
+	// dbMu guards swaps between the trial (in-memory) and licensed (on-disk)
+	// DBs that happen mid-session when the user activates or deactivates a
+	// license. Reads grab RLock, the swap grabs Lock — *sql.DB.Close blocks
+	// on in-flight queries so the closed connection only goes away once any
+	// caller still holding the old pointer is done.
+	dbMu sync.RWMutex
+	db   *db.DB
+
+	// license is the licensing state machine. When unlicensed the DB is
+	// opened in :memory: mode so imports don't persist across launches.
+	license       *license.State
+	stopHeartbeat context.CancelFunc
 
 	// pendingFiles buffers any file paths the OS hands us before the frontend
 	// is mounted and ready to receive events. OnFileOpen on macOS reliably
@@ -75,9 +88,37 @@ func (a *App) PendingFileOpens() []string {
 // telling the user up front.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	store, err := db.Open(ctx)
+
+	// Resolve the per-user config dir up front — the license state writes to
+	// the same dir the DB lives in, and we want a clean failure if neither
+	// works rather than a surprise mid-flow.
+	cfgDir, cfgErr := os.UserConfigDir()
+	if cfgErr != nil {
+		log.Printf("UserConfigDir failed: %v", cfgErr)
+		_, _ = runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "TachoLens — startup failed",
+			Message: fmt.Sprintf("Could not locate user config directory:\n\n%v\n\nThe app will now exit.", cfgErr),
+		})
+		runtime.Quit(ctx)
+		return
+	}
+	tachoDir := filepath.Join(cfgDir, "tacho-ui")
+	a.license = license.New(tachoDir, BuildDate)
+
+	var (
+		store *db.DB
+		err   error
+	)
+	if a.license.Licensed() {
+		store, err = db.Open(ctx)
+	} else {
+		// Trial mode: in-memory SQLite. Same migrations apply, all bound
+		// reads/writes work identically — data just vanishes at exit.
+		store, err = db.OpenInMemory(ctx)
+	}
 	if err != nil {
-		log.Printf("db.Open failed: %v", err)
+		log.Printf("db open failed: %v", err)
 		_, _ = runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
 			Type:    runtime.ErrorDialog,
 			Title:   "TachoLens — startup failed",
@@ -87,7 +128,13 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	a.db = store
-	log.Printf("DB ready at %s", store.Path())
+	if a.license.Licensed() {
+		log.Printf("DB ready (licensed) at %s", store.Path())
+	} else {
+		log.Printf("DB ready (trial / in-memory)")
+	}
+
+	a.stopHeartbeat = a.license.StartHeartbeatLoop(ctx)
 
 	// Initialise Sparkle. In release builds (`-tags sparkle`) this kicks off
 	// the scheduled background check per Info.plist's SUScheduledCheckInterval.
@@ -97,6 +144,9 @@ func (a *App) startup(ctx context.Context) {
 
 // shutdown is called by Wails when the window closes. Close the DB cleanly.
 func (a *App) shutdown(_ context.Context) {
+	if a.stopHeartbeat != nil {
+		a.stopHeartbeat()
+	}
 	if a.db != nil {
 		_ = a.db.Close()
 	}
@@ -107,10 +157,45 @@ func (a *App) shutdown(_ context.Context) {
 // this only fires during the brief interval between dialog dismissal and the
 // window actually closing.
 func (a *App) store() (*db.DB, error) {
+	a.dbMu.RLock()
+	defer a.dbMu.RUnlock()
 	if a.db == nil {
 		return nil, errors.New("database not initialised")
 	}
 	return a.db, nil
+}
+
+// swapDB closes the current store and replaces it with a fresh one in the
+// licensed/trial mode requested. Called from ActivateLicense / DeactivateLicense
+// so the UI doesn't need a "restart" loop. The closed connection blocks on any
+// in-flight queries (per *sql.DB.Close semantics) so callers holding the old
+// pointer finish cleanly.
+func (a *App) swapDB(licensed bool) error {
+	var (
+		next *db.DB
+		err  error
+	)
+	if licensed {
+		next, err = db.Open(a.ctx)
+	} else {
+		next, err = db.OpenInMemory(a.ctx)
+	}
+	if err != nil {
+		return err
+	}
+	a.dbMu.Lock()
+	old := a.db
+	a.db = next
+	a.dbMu.Unlock()
+	if old != nil {
+		_ = old.Close()
+	}
+	if licensed {
+		log.Printf("DB swapped to on-disk at %s", next.Path())
+	} else {
+		log.Printf("DB swapped to in-memory (trial)")
+	}
+	return nil
 }
 
 // ===== Imports =====
@@ -272,4 +357,46 @@ func (a *App) AppVersion() string {
 // (without the `sparkle` build tag) this is a no-op.
 func (a *App) CheckForUpdates() {
 	updater.CheckForUpdates()
+}
+
+// ===== Licensing =====
+
+// LicenseStatus returns the current licensing state for the frontend. Safe to
+// call repeatedly — the underlying state is in-memory after the startup load.
+func (a *App) LicenseStatus() license.Status {
+	if a.license == nil {
+		return license.Status{}
+	}
+	return a.license.Snapshot()
+}
+
+// ActivateLicense exchanges a user-entered key for a signed JWT, persists it,
+// and live-swaps the DB from in-memory trial mode to the on-disk persistent
+// store. Any imports made during this trial session are lost — they only
+// lived in the in-memory DB that we're about to close.
+func (a *App) ActivateLicense(key string) (license.Status, error) {
+	if a.license == nil {
+		return license.Status{}, errors.New("license subsystem not initialised")
+	}
+	status, err := a.license.Activate(a.ctx, key)
+	if err != nil {
+		return status, err
+	}
+	if err := a.swapDB(true); err != nil {
+		return status, fmt.Errorf("open persistent database: %w", err)
+	}
+	return status, nil
+}
+
+// DeactivateLicense removes the local license file and swaps the DB back to
+// in-memory trial mode. The on-disk database file is left untouched; next
+// activation on this machine will pick it back up.
+func (a *App) DeactivateLicense() error {
+	if a.license == nil {
+		return errors.New("license subsystem not initialised")
+	}
+	if err := a.license.Deactivate(); err != nil {
+		return err
+	}
+	return a.swapDB(false)
 }

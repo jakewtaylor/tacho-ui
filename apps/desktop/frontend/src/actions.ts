@@ -1,11 +1,13 @@
 import type { ActionFunctionArgs } from "react-router-dom";
 
 import {
+  ActivateLicense,
+  DeactivateLicense,
   ImportDDDFromBytes,
   ImportDDDFromPath,
   WipeDatabase,
 } from "../wailsjs/go/main/App";
-import type { db } from "../wailsjs/go/models";
+import type { db, license } from "../wailsjs/go/models";
 
 export type ImportActionResult =
   | { ok: true; result: db.ImportResult }
@@ -13,6 +15,14 @@ export type ImportActionResult =
 
 export type WipeActionResult =
   | { ok: true; stats: db.WipeStats }
+  | { ok: false; message: string };
+
+export type ActivateLicenseActionResult =
+  | { ok: true; status: license.Status }
+  | { ok: false; message: string };
+
+export type DeactivateLicenseActionResult =
+  | { ok: true }
   | { ok: false; message: string };
 
 /**
@@ -91,6 +101,47 @@ export async function wipeAction(): Promise<WipeActionResult> {
   try {
     const stats = await WipeDatabase();
     return { ok: true, stats };
+  } catch (e: unknown) {
+    return { ok: false, message: String((e as Error)?.message ?? e) };
+  }
+}
+
+/**
+ * Resource-route action for license activation. Form field `key` holds the
+ * license string. The Go side validates with the server, persists the JWT,
+ * and live-swaps the DB connection — no app restart needed. Returning
+ * triggers React Router's automatic revalidation of every loader, which
+ * means layoutLoader re-fetches LicenseStatus and the trial banner disappears.
+ */
+export async function activateLicenseAction({
+  request,
+}: ActionFunctionArgs): Promise<ActivateLicenseActionResult> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch (e: unknown) {
+    return {
+      ok: false,
+      message: `Bad form data: ${String((e as Error)?.message ?? e)}`,
+    };
+  }
+  const key = formData.get("key");
+  if (typeof key !== "string" || !key) {
+    return { ok: false, message: "No license key provided" };
+  }
+  try {
+    const status = await ActivateLicense(key);
+    return { ok: true, status };
+  } catch (e: unknown) {
+    return { ok: false, message: String((e as Error)?.message ?? e) };
+  }
+}
+
+/** Resource-route action for removing the local license. */
+export async function deactivateLicenseAction(): Promise<DeactivateLicenseActionResult> {
+  try {
+    await DeactivateLicense();
+    return { ok: true };
   } catch (e: unknown) {
     return { ok: false, message: String((e as Error)?.message ?? e) };
   }

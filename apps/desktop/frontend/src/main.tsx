@@ -6,11 +6,18 @@ import "@tacholens/ui/globals.css";
 import "./style.css";
 import { Toaster } from "@tacholens/ui/components/sonner";
 import { TooltipProvider } from "@tacholens/ui/components/tooltip";
-import { importAction, importFromPathAction, wipeAction } from "./actions";
+import {
+  activateLicenseAction,
+  deactivateLicenseAction,
+  importAction,
+  importFromPathAction,
+  wipeAction,
+} from "./actions";
 import { AppLayout } from "./layouts/app-layout";
 import { driverLoader, layoutLoader } from "./loaders";
 import { DayPage } from "./pages/DayPage";
 import { Home } from "./pages/Home";
+import { LicensePage } from "./pages/LicensePage";
 import { Overview } from "./pages/Overview";
 import { PrintWeekPage } from "./pages/PrintWeekPage";
 import { RouteError } from "./pages/RouteError";
@@ -24,6 +31,9 @@ const router = createHashRouter([
     errorElement: <RouteError />,
     children: [
       { index: true, element: <Home /> },
+      { path: "license", element: <LicensePage /> },
+      { path: "license/activate", action: activateLicenseAction },
+      { path: "license/deactivate", action: deactivateLicenseAction },
       { path: "import", action: importAction },
       { path: "import-from-path", action: importFromPathAction },
       { path: "wipe", action: wipeAction },

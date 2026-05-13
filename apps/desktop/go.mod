@@ -3,6 +3,7 @@ module tacho-ui
 go 1.25.0
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/traconiq/tachoparser v0.0.0-20260424093435-b1dc8d5ec83e
 	github.com/wailsapp/wails/v2 v2.12.0
 	modernc.org/sqlite v1.50.1

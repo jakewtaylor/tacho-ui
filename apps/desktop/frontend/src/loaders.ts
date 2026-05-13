@@ -7,17 +7,22 @@ import {
   GetEventsAndFaults,
   GetGnssPoints,
   GetPlaceRecords,
+  LicenseStatus,
   ListDrivers,
 } from "../wailsjs/go/main/App";
-import type { db } from "../wailsjs/go/models";
+import type { db, license } from "../wailsjs/go/models";
 
 export type LayoutLoaderData = {
   drivers: db.DriverSummary[];
+  licenseStatus: license.Status;
 };
 
 export async function layoutLoader(): Promise<LayoutLoaderData> {
-  const drivers = await ListDrivers();
-  return { drivers: drivers ?? [] };
+  const [drivers, licenseStatus] = await Promise.all([
+    ListDrivers(),
+    LicenseStatus(),
+  ]);
+  return { drivers: drivers ?? [], licenseStatus };
 }
 
 export type DriverLoaderData = {
