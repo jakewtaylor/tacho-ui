@@ -17,6 +17,13 @@ output.err
 /frontend/node_modules/
 /frontend/package.json.md5
 
+# Transient: submission ID stashed by release.sh, consumed by finish-release.sh
+/.notarization-id
+
+# Staging directory for Sparkle's generate_appcast (zip artefacts; appcast.xml
+# is copied out to docs/appcast.xml and that one IS committed).
+/releases/
+
 # Local-only env (Google Maps API key, etc.)
 /frontend/.env
 /frontend/.env.local
@@ -25,3 +32,4 @@ output.err
 *.swp
 *.swo
 Thumbs.db
+third_party/

@@ -14,6 +14,7 @@ import (
 
 	"tacho-ui/internal/db"
 	"tacho-ui/internal/importer"
+	"tacho-ui/internal/updater"
 )
 
 // fileOpenedEvent is the runtime-event name the frontend listens on when the
@@ -87,6 +88,11 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.db = store
 	log.Printf("DB ready at %s", store.Path())
+
+	// Initialise Sparkle. In release builds (`-tags sparkle`) this kicks off
+	// the scheduled background check per Info.plist's SUScheduledCheckInterval.
+	// In dev builds the call is a no-op (stub implementation).
+	updater.Start()
 }
 
 // shutdown is called by Wails when the window closes. Close the DB cleanly.
@@ -253,4 +259,17 @@ func (a *App) WipeDatabase() (*db.WipeStats, error) {
 // See https://github.com/wailsapp/wails/pull/2822.
 func (a *App) PrintWindow() {
 	runtime.WindowPrint(a.ctx)
+}
+
+// AppVersion returns the build-time version string (e.g. "v0.1.0"). Defaults
+// to "dev" for un-tagged local builds. Bound for display in the UI / About.
+func (a *App) AppVersion() string {
+	return Version
+}
+
+// CheckForUpdates triggers a Sparkle user-initiated check. Shows native UI
+// either way ("update available" or "you're up to date"). In dev builds
+// (without the `sparkle` build tag) this is a no-op.
+func (a *App) CheckForUpdates() {
+	updater.CheckForUpdates()
 }

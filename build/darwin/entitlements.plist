@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+    Entitlements for Developer ID distribution with Hardened Runtime.
+    These three relax just enough of Hardened Runtime for WKWebView /
+    WebKit to work; without them the page never renders and Apple
+    notarization still passes but the launched app silently fails.
+    -->
+
+    <!-- WebKit's V8 JIT compiles JS to native at runtime. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- WebKit also writes to pages it then executes (codegen paths). -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- WebKit loads system frameworks we didn't sign ourselves. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

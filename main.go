@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
@@ -13,9 +14,30 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// Version is overridden at build time via ldflags:
+//
+//	go build -ldflags "-X main.Version=v1.2.3"
+//
+// In dev builds it stays "dev". Sparkle reads CFBundleShortVersionString from
+// Info.plist (set independently in wails.json's info.productVersion); this
+// const is for in-app display / logging.
+var Version = "dev"
+
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
+
+	// Application menu. The role-based AppMenu/EditMenu give us the standard
+	// macOS bar (About, Hide, Quit, copy/paste etc.); the Help submenu hosts
+	// the Sparkle "Check for Updates…" entry. In dev builds the click is a
+	// no-op (updater package stubs out without the `sparkle` build tag).
+	appMenu := menu.NewMenu()
+	appMenu.Append(menu.AppMenu())
+	appMenu.Append(menu.EditMenu())
+	helpMenu := appMenu.AddSubmenu("Help")
+	helpMenu.AddText("Check for Updates…", nil, func(_ *menu.CallbackData) {
+		app.CheckForUpdates()
+	})
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -26,6 +48,7 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		Menu:             appMenu,
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		// SingleInstanceLock ensures that double-clicking a .ddd file while
