@@ -1,0 +1,15 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>tacho-ui</title>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Wed, 13 May 2026 09:41:14 +0100</pubDate>
+            <link>https://github.com/jakewtaylor/tacho-ui</link>
+            <sparkle:version>0.1.0</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>10.13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/jakewtaylor/tacho-ui/releases/download/v0.1.0/tacho-ui-0.1.0.zip" length="12901141" type="application/octet-stream" sparkle:edSignature="E/XyZ8BtsCjied+jxW19Q5J9dTN9ifwauW43V8bGEtXwjOg2MDXJbWNzGw6eNBrO7NQB/rD+wfkwB5aM6aSOAg=="/>
+        </item>
+    </channel>
+</rss>
