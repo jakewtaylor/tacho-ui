@@ -11,6 +11,7 @@
     "email": "me@jaketaylor.co"
   },
   "info": {
+    "productName": "TachoLens",
     "fileAssociations": [
       {
         "ext": "ddd",

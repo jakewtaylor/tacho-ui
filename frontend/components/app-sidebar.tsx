@@ -59,7 +59,7 @@ export function AppSidebar({
             className="size-12 rounded-md"
           />
           <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate font-semibold">Tachograph</span>
+            <span className="truncate font-semibold">TachoLens</span>
             <span className="truncate text-xs text-muted-foreground">
               Driver-card viewer
             </span>

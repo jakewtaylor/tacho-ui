@@ -233,7 +233,7 @@ export function AppLayout() {
               <AlertDialogDescription asChild>
                 <div className="space-y-2">
                   <p>
-                    Tachograph Viewer was launched with a driver-card file.
+                    TachoLens was launched with a driver-card file.
                     Import it into the database?
                   </p>
                   <p className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">

@@ -80,7 +80,7 @@ func (a *App) startup(ctx context.Context) {
 		log.Printf("db.Open failed: %v", err)
 		_, _ = runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
 			Type:    runtime.ErrorDialog,
-			Title:   "Tachograph Viewer — startup failed",
+			Title:   "TachoLens — startup failed",
 			Message: fmt.Sprintf("Could not open the local database:\n\n%v\n\nThe app will now exit.", err),
 		})
 		runtime.Quit(ctx)

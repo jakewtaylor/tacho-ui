@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const BASE_TITLE = "Tachograph Viewer";
+const BASE_TITLE = "TachoLens";
 
 /**
  * Sets `document.title` for the lifetime of the calling component and restores
@@ -21,7 +21,7 @@ export function useDocumentTitle(title: string | null | undefined) {
   }, [title]);
 }
 
-/** Suffix a page-specific title with the app base, e.g. "Weekly summary · Tachograph Viewer". */
+/** Suffix a page-specific title with the app base, e.g. "Weekly summary · TachoLens". */
 export function pageTitle(specific: string | null | undefined): string {
   if (!specific) return BASE_TITLE;
   return `${specific} · ${BASE_TITLE}`;

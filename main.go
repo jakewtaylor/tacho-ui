@@ -41,7 +41,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "Tachograph Viewer · " + Version,
+		Title:  "TachoLens · " + Version,
 		Width:  1024,
 		Height: 768,
 		AssetServer: &assetserver.Options{
