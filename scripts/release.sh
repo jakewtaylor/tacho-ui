@@ -70,10 +70,17 @@ echo
 # -- build --------------------------------------------------------------------
 
 # Patch wails.json's info.productVersion so Wails templates the right
-# CFBundleShortVersionString / CFBundleVersion into Info.plist. Use a trap so
-# the file is restored even if the build fails.
+# CFBundleShortVersionString / CFBundleVersion into Info.plist. The trap
+# restores wails.json on ANY exit — including the case where we later `exec`
+# into finish-release.sh below, which we deliberately don't do until the
+# restore has run.
 cp wails.json wails.json.bak
-trap 'mv wails.json.bak wails.json 2>/dev/null || true' EXIT
+restore_wails_json() {
+    if [[ -f wails.json.bak ]]; then
+        mv wails.json.bak wails.json
+    fi
+}
+trap restore_wails_json EXIT
 python3 -c "
 import json, sys
 d = json.load(open('wails.json'))
@@ -82,8 +89,17 @@ json.dump(d, open('wails.json', 'w'), indent=2)
 open('wails.json', 'a').write('\n')
 "
 
+# Regenerate TS bindings BEFORE the sparkle-tagged build, using a non-sparkle
+# build of the bindings scanner. Wails' build step normally re-generates
+# bindings by spawning a temp binary linked with our build flags — with
+# -tags sparkle that temp binary tries to load Sparkle.framework from a
+# missing rpath at scan time. -skipbindings on the real build sidesteps it.
+echo "==> regenerate TS bindings (no sparkle tag)"
+wails generate module
+
+echo
 echo "==> wails build (universal, sparkle tag)"
-wails build -platform darwin/universal -trimpath -clean \
+wails build -platform darwin/universal -trimpath -clean -skipbindings \
     -tags sparkle \
     -ldflags "-X main.Version=$VERSION"
 
@@ -167,5 +183,10 @@ echo "  if anything below this point fails, resume with:"
 echo "      ./scripts/finish-release.sh"
 
 # -- wait + staple + verify (delegated, so this flow can be resumed) ----------
+
+# Restore wails.json BEFORE exec, because exec replaces this shell process
+# and any trap registered above won't fire afterwards.
+restore_wails_json
+trap - EXIT
 
 exec "$REPO_ROOT/scripts/finish-release.sh" "$SUB_ID"
