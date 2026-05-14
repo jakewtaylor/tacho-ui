@@ -563,8 +563,12 @@ function CountryArrowChain({
         </span>
       ))}
       {hasOffmap && (
-        <Badge variant="outline" className="ml-2 font-mono text-[10px] text-muted-foreground">
-          off-map leg
+        <Badge
+          variant="outline"
+          className="ml-2 font-mono text-[10px] text-muted-foreground"
+          title="At some point in this journey the vehicle was off the VU's onboard digital map — usually a ferry crossing, occasionally a stretch of unmapped road. Expand the journey to see when and where."
+        >
+          via off-map (ferry?)
         </Badge>
       )}
     </div>
