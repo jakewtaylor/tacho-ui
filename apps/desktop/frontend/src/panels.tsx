@@ -570,12 +570,14 @@ function CountryArrowChain({
       {hasOffmap && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge
-              variant="outline"
-              className="ml-2 cursor-help font-mono text-[10px] text-muted-foreground"
-            >
-              via off-map (ferry?)
-            </Badge>
+            <span className="ml-2 inline-flex">
+              <Badge
+                variant="outline"
+                className="cursor-help font-mono text-[10px] text-muted-foreground"
+              >
+                via off-map (ferry?)
+              </Badge>
+            </span>
           </TooltipTrigger>
           <TooltipContent>
             At some point in this journey the vehicle was off the VU's
