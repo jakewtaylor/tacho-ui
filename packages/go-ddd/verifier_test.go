@@ -4,20 +4,37 @@ import (
 	"testing"
 )
 
-// fakeVerifier returns a configurable result per (FID, generation) so
-// tests can exercise mixed verified / failed / unverifiable outcomes.
+// fakeVerifier maps (gen, FID) → fixed VerifyResult so tests can
+// exercise mixed verified / failed / unverifiable outcomes. Real
+// verifiers maintain internal state to build the cert chain; this
+// stub just records every Add call and emits the configured result on
+// Finalise.
 type fakeVerifier struct {
-	results map[uint32]VerifyResult
-	calls   []SignedEF
+	results    map[uint32]VerifyResult
+	pending    []SignedEF
+	chainValid bool
 }
 
-func (f *fakeVerifier) Verify(ef SignedEF) VerifyResult {
-	f.calls = append(f.calls, ef)
-	key := uint32(ef.Generation)<<16 | uint32(ef.FID)
-	if r, ok := f.results[key]; ok {
-		return r
+func (f *fakeVerifier) Add(ef SignedEF) {
+	f.pending = append(f.pending, ef)
+}
+
+func (f *fakeVerifier) Finalise() (bool, []EFSignature) {
+	out := make([]EFSignature, len(f.pending))
+	for i, ef := range f.pending {
+		key := uint32(ef.Generation)<<16 | uint32(ef.FID)
+		res, ok := f.results[key]
+		if !ok {
+			res = VerifyResult{Status: VerifyUnverifiable, Reason: "no fixture"}
+		}
+		out[i] = EFSignature{
+			FID:        ef.FID,
+			Generation: ef.Generation,
+			Status:     res.Status.String(),
+			Reason:     res.Reason,
+		}
 	}
-	return VerifyResult{Status: VerifyUnverifiable, Reason: "no fixture"}
+	return f.chainValid, out
 }
 
 func key(gen int, fid uint16) uint32 {
@@ -65,28 +82,30 @@ func TestParseCardCustomVerifierGetsCalledForEachEF(t *testing.T) {
 	stream = append(stream, tlvFrame(0x0520, 0x02, body)...)
 	stream = append(stream, tlvFrame(0x0520, 0x03, []byte("g2-sig"))...)
 
-	v := &fakeVerifier{results: map[uint32]VerifyResult{
-		key(1, 0x0520): {Status: VerifyVerified},
-		key(2, 0x0520): {Status: VerifyFailed, Reason: "signature mismatch"},
-	}}
+	v := &fakeVerifier{
+		chainValid: true,
+		results: map[uint32]VerifyResult{
+			key(1, 0x0520): {Status: VerifyVerified},
+			key(2, 0x0520): {Status: VerifyFailed, Reason: "signature mismatch"},
+		},
+	}
 	c, err := ParseCard(stream, WithVerifier(v))
 	if err != nil {
 		t.Fatalf("ParseCard: %v", err)
 	}
 
-	if len(v.calls) != 2 {
-		t.Fatalf("Verifier called %d times, want 2", len(v.calls))
+	if len(v.pending) != 2 {
+		t.Fatalf("Verifier got %d Add calls, want 2", len(v.pending))
 	}
-	// Sig records must carry the right data + sig bytes — TAYLOR is
-	// at offset 66 of makeIdentificationBody (HolderSurname field).
-	if string(v.calls[0].Body[66:72]) != "TAYLOR" {
-		t.Errorf("Verifier call 0 didn't receive EF body — got %q at offset 66", string(v.calls[0].Body[66:72]))
+	// TAYLOR is at offset 66 of makeIdentificationBody (HolderSurname field).
+	if string(v.pending[0].Body[66:72]) != "TAYLOR" {
+		t.Errorf("Verifier call 0 didn't receive EF body — got %q at offset 66", string(v.pending[0].Body[66:72]))
 	}
-	if string(v.calls[0].Signature) != "g1-sig" {
-		t.Errorf("Verifier call 0 sig = %q, want g1-sig", v.calls[0].Signature)
+	if string(v.pending[0].Signature) != "g1-sig" {
+		t.Errorf("Verifier call 0 sig = %q, want g1-sig", v.pending[0].Signature)
 	}
-	if string(v.calls[1].Signature) != "g2-sig" {
-		t.Errorf("Verifier call 1 sig = %q, want g2-sig", v.calls[1].Signature)
+	if string(v.pending[1].Signature) != "g2-sig" {
+		t.Errorf("Verifier call 1 sig = %q, want g2-sig", v.pending[1].Signature)
 	}
 
 	if c.Signature.VerifiedCount != 1 {
@@ -98,6 +117,10 @@ func TestParseCardCustomVerifierGetsCalledForEachEF(t *testing.T) {
 	if c.Signature.UnverifiableCount != 0 {
 		t.Errorf("UnverifiableCount = %d, want 0", c.Signature.UnverifiableCount)
 	}
+	// One verified + one failed → Verified false (FailedCount > 0).
+	if c.Verified {
+		t.Errorf("Verified should be false when any EF failed")
+	}
 }
 
 func TestCardVerifiedFlagRequiresAllConditions(t *testing.T) {
@@ -105,36 +128,26 @@ func TestCardVerifiedFlagRequiresAllConditions(t *testing.T) {
 	stream := append([]byte(nil), tlvFrame(0x0520, 0x00, body)...)
 	stream = append(stream, tlvFrame(0x0520, 0x01, []byte("sig"))...)
 
-	// Verifier says ok, but ChainValid is false → Verified should stay false.
-	v := &fakeVerifier{results: map[uint32]VerifyResult{
-		key(1, 0x0520): {Status: VerifyVerified},
-	}}
+	// Chain invalid → Verified false.
+	v := &fakeVerifier{
+		chainValid: false,
+		results:    map[uint32]VerifyResult{key(1, 0x0520): {Status: VerifyVerified}},
+	}
 	c, _ := ParseCard(stream, WithVerifier(v))
 	if c.Verified {
-		t.Errorf("Verified=true with ChainValid=false should not be possible")
+		t.Errorf("Verified should be false when ChainValid is false")
 	}
 
-	// ChainValid alone, but no EFs verified, should also be false.
-	c2, _ := ParseCard(nil) // empty triggers error, skip
-	_ = c2
-
-	// All conditions hold: simulate by setting ChainValid post-parse, then
-	// recomputing. (B.2+ will set ChainValid from inside the real chain
-	// validator; for now this exercises the aggregation rule.)
-	c.Signature.ChainValid = true
-	finaliseSignatureSummary(c)
+	// Chain valid + EF verified → Verified true.
+	v.chainValid = true
+	c, _ = ParseCard(stream, WithVerifier(v))
 	if !c.Verified {
 		t.Errorf("Verified should be true when ChainValid + EFs verified + no failures")
 	}
 
 	// Add a failed EF — Verified should flip back to false.
-	c.Signature.EFs = append(c.Signature.EFs, EFSignature{
-		FID: 0x0504, Generation: 1, Status: "failed", Reason: "bad sig",
-	})
-	c.Signature.VerifiedCount = 0
-	c.Signature.FailedCount = 0
-	c.Signature.UnverifiableCount = 0
-	finaliseSignatureSummary(c)
+	v.results[key(1, 0x0520)] = VerifyResult{Status: VerifyFailed, Reason: "bad sig"}
+	c, _ = ParseCard(stream, WithVerifier(v))
 	if c.Verified {
 		t.Errorf("Verified should be false when any EF failed")
 	}
@@ -160,15 +173,17 @@ func TestParseCardDecodeFailureStillPairsSignature(t *testing.T) {
 	stream := append([]byte(nil), tlvFrame(0x0520, 0x00, bogusBody)...)
 	stream = append(stream, tlvFrame(0x0520, 0x01, []byte("sig"))...)
 
-	v := &fakeVerifier{results: map[uint32]VerifyResult{
-		key(1, 0x0520): {Status: VerifyFailed, Reason: "bad sig"},
-	}}
+	v := &fakeVerifier{
+		results: map[uint32]VerifyResult{
+			key(1, 0x0520): {Status: VerifyFailed, Reason: "bad sig"},
+		},
+	}
 	c, err := ParseCard(stream, WithVerifier(v))
 	if err != nil {
 		t.Fatalf("ParseCard: %v", err)
 	}
-	if len(v.calls) != 1 {
-		t.Fatalf("verifier should be called even when decoder failed; got %d calls", len(v.calls))
+	if len(v.pending) != 1 {
+		t.Fatalf("verifier should be Add'd even when decoder failed; got %d", len(v.pending))
 	}
 	if len(c.DecodeErrors) == 0 {
 		t.Errorf("decode error should still be recorded")

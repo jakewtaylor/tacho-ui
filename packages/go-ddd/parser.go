@@ -31,25 +31,39 @@ func ParseCard(data []byte, opts ...ParseOption) (*Card, error) {
 	cfg := resolveOpts(opts)
 
 	c := &Card{}
-	// pending tracks the last data record seen, so when a sig record
-	// arrives we know what body it signed. App. 7 §3.2 guarantees the
-	// pairing — every signature record immediately follows its data
-	// record in the stream.
+	// pending tracks the last data record seen. When a sig record
+	// arrives we pair it with pending (App. 7 §3.2 guarantees the
+	// adjacency). When the *next* data record arrives without a sig
+	// in between, the previous one was unsigned (e.g. cert EFs at
+	// C100 / C108) — flush it with Signature nil so the verifier can
+	// still collect certs.
+	flush := func(prev tlv.Record, sig []byte) {
+		cfg.verifier.Add(SignedEF{
+			FID:        prev.FID,
+			Generation: prev.Type.Generation(),
+			Body:       prev.Value,
+			Signature:  sig,
+		})
+	}
 	var pending *tlv.Record
 	err := tlv.Walk(data, func(rec tlv.Record) error {
 		if rec.Type.IsSignature() {
 			if pending != nil && pending.FID == rec.FID &&
 				pending.Type.Generation() == rec.Type.Generation() {
-				recordEFSignature(c, cfg.verifier, *pending, rec)
+				flush(*pending, rec.Value)
+				pending = nil
 			}
 			// A signature without a matching preceding data record is
 			// invalid framing per the spec, but we shrug and continue
 			// — Card.DecodeErrors will surface anything that mattered.
-			pending = nil
 			return nil
 		}
 		if !rec.Type.IsData() {
 			return nil
+		}
+		// New data record. Flush any pending unsigned record first.
+		if pending != nil {
+			flush(*pending, nil)
 		}
 		// Decode the EF body. The pending pointer is set regardless of
 		// decode success — the signature is over the raw bytes, not
@@ -66,25 +80,13 @@ func ParseCard(data []byte, opts ...ParseOption) (*Card, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ddd: parse card: %w", err)
 	}
+	// Flush trailing unsigned record (no sig followed).
+	if pending != nil {
+		flush(*pending, nil)
+	}
+	c.Signature.ChainValid, c.Signature.EFs = cfg.verifier.Finalise()
 	finaliseSignatureSummary(c)
 	return c, nil
-}
-
-// recordEFSignature runs the configured Verifier against one (data,
-// sig) pair and stores the result on the Card.
-func recordEFSignature(c *Card, v Verifier, data tlv.Record, sig tlv.Record) {
-	res := v.Verify(SignedEF{
-		FID:        data.FID,
-		Generation: data.Type.Generation(),
-		Body:       data.Value,
-		Signature:  sig.Value,
-	})
-	c.Signature.EFs = append(c.Signature.EFs, EFSignature{
-		FID:        data.FID,
-		Generation: data.Type.Generation(),
-		Status:     res.Status.String(),
-		Reason:     res.Reason,
-	})
 }
 
 // finaliseSignatureSummary fills in the count fields and the top-level
