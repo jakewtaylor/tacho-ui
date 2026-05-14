@@ -45,6 +45,7 @@ import {
   type BorderTrip,
   type Journey,
 } from "./borderCrossings";
+import { JourneyMap } from "./JourneyMap";
 import { ChevronRight } from "lucide-react";
 import type { db } from "../wailsjs/go/models";
 
@@ -573,10 +574,12 @@ function JourneyRow({
   journey,
   isExpanded,
   onToggle,
+  gnssPoints,
 }: {
   journey: Journey;
   isExpanded: boolean;
   onToggle: () => void;
+  gnssPoints: db.GnssPoint[];
 }) {
   const dur = formatDuration(journey.durationMinutes);
   return (
@@ -609,10 +612,18 @@ function JourneyRow({
           </div>
         </TableCell>
       </TableRow>
-      {isExpanded &&
-        journey.legs.map((leg, i) => (
-          <JourneyLegRow key={`leg-${journey.startAt}-${i}`} leg={leg} />
-        ))}
+      {isExpanded && (
+        <>
+          <TableRow>
+            <TableCell colSpan={5} className="p-0">
+              <JourneyMap journey={journey} gnssPoints={gnssPoints} />
+            </TableCell>
+          </TableRow>
+          {journey.legs.map((leg, i) => (
+            <JourneyLegRow key={`leg-${journey.startAt}-${i}`} leg={leg} />
+          ))}
+        </>
+      )}
     </>
   );
 }
@@ -685,8 +696,10 @@ function JourneyLegRow({ leg }: { leg: BorderTrip }) {
 
 export function BorderCrossingsPanel({
   crossings,
+  gnssPoints,
 }: {
   crossings: db.BorderCrossing[];
+  gnssPoints: db.GnssPoint[];
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -748,6 +761,7 @@ export function BorderCrossingsPanel({
                   journey={j}
                   isExpanded={!!expanded[key]}
                   onToggle={() => toggle(key)}
+                  gnssPoints={gnssPoints}
                 />
               );
             })}

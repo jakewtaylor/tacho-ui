@@ -36,7 +36,10 @@ export function Overview() {
         placeRecords={data.placeRecords}
         vehicles={data.vehicles}
       />
-      <BorderCrossingsPanel crossings={data.borderCrossings} />
+      <BorderCrossingsPanel
+        crossings={data.borderCrossings}
+        gnssPoints={data.gnssPoints}
+      />
       <CargoPanel
         loadUnloadOps={data.loadUnloadOps}
         loadTypeEntries={data.loadTypeEntries}
