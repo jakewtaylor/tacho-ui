@@ -28,10 +28,15 @@ type PlaceRecord struct {
 // Total: 10 bytes.
 const placeRecordLen = 10
 
-// Gen2 appends an optional GNSS sub-record (timeStamp + accuracy +
-// geoCoordinates = 13 bytes), yielding 23 bytes total. Gen2v2 keeps the
-// same layout.
-const placeRecordLenGen2 = 23
+// Gen2 appends a GNSSPlaceRecord (timeStamp 4 + accuracy 1 +
+// geoCoordinates 6 = 11 bytes), yielding 21 bytes total. GeoCoordinates
+// is two 3-byte signed integers — not 8 bytes — per App. 1 §2.76.
+const placeRecordLenGen2 = 21
+
+// Gen2v2 swaps GNSSPlaceRecord for GNSSPlaceAuthRecord, which adds a
+// 1-byte authenticationStatus field, yielding 22 bytes total. Reg.
+// 2021/1228 §2.79a.
+const placeRecordLenGen2v2 = 22
 
 // DecodePlaces parses EF_Places. Body = 1-byte pointer to newest +
 // fixed cyclic array. The record width is auto-detected from the array
@@ -43,14 +48,14 @@ func DecodePlaces(body []byte) ([]PlaceRecord, error) {
 	pointer := int(body[0])
 	arr := body[1:]
 
-	recordLen, err := pickRecordWidth(len(arr), placeRecordLen, placeRecordLenGen2)
+	recordLen, err := pickRecordWidth(len(arr), placeRecordLen, placeRecordLenGen2, placeRecordLenGen2v2)
 	if err != nil {
 		// Fall back to a 2-byte pointer interpretation — some readers
 		// emit a wider pointer.
 		if len(body) >= 2 {
 			pointer = int(body[0])<<8 | int(body[1])
 			arr = body[2:]
-			recordLen, err = pickRecordWidth(len(arr), placeRecordLen, placeRecordLenGen2)
+			recordLen, err = pickRecordWidth(len(arr), placeRecordLen, placeRecordLenGen2, placeRecordLenGen2v2)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("card: EF_Places: %w", err)

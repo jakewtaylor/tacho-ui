@@ -14,9 +14,11 @@ import (
 // verification is not performed in Phase A — Card.Verified will read
 // false.
 //
-// The returned Card may contain only a subset of the fields populated
-// — fields whose underlying EF decoder is not yet implemented are left
-// nil. Callers should expect to handle nil pointers across the struct.
+// Per-EF decoder failures are non-fatal: they are appended to
+// Card.DecodeErrors and parsing continues with the next record. This
+// matches upstream behaviour and ensures a single malformed/unknown EF
+// can't black-hole the whole card. Framing errors (truncated TLV) still
+// terminate the parse.
 func ParseCard(data []byte) (*Card, error) {
 	if len(data) == 0 {
 		return nil, ErrEmpty
@@ -33,7 +35,10 @@ func ParseCard(data []byte) (*Card, error) {
 		if !rec.Type.IsData() {
 			return nil
 		}
-		return dispatchCardEF(c, rec)
+		if err := dispatchCardEF(c, rec); err != nil {
+			c.DecodeErrors = append(c.DecodeErrors, err.Error())
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ddd: parse card: %w", err)

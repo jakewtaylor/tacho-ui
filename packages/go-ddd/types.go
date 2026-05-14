@@ -35,6 +35,11 @@ type Card struct {
 	// these always read false.
 	Verified  bool              `json:"verified"`
 	Signature SignatureSummary  `json:"signature_summary"`
+
+	// DecodeErrors accumulates any per-EF decode failures encountered
+	// during parse. A non-empty slice doesn't mean the parse failed —
+	// the recognised EFs are still populated.
+	DecodeErrors []string `json:"decode_errors,omitempty"`
 }
 
 // SignatureSummary records the outcome of signature verification across
