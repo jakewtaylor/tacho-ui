@@ -94,6 +94,35 @@ func (d *DB) GetDriverProfile(ctx context.Context, cardNumber string) (*DriverPr
 	return &p, nil
 }
 
+// GetLatestSignatureSummary returns the signature verification summary
+// from the most recent import for the given driver, or (nil, nil) if
+// the driver has no imports or the summary is empty. Empty summaries
+// correspond to imports done before B.5 / with no verifier configured.
+func (d *DB) GetLatestSignatureSummary(ctx context.Context, cardNumber string) (*SignatureSummary, error) {
+	const q = `
+        SELECT signature_summary_json
+        FROM imports
+        WHERE driver_card_number = ?
+        ORDER BY imported_at DESC
+        LIMIT 1`
+	var raw string
+	err := d.conn.QueryRowContext(ctx, q, cardNumber).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get signature summary: %w", err)
+	}
+	if raw == "" || raw == "{}" {
+		return nil, nil
+	}
+	var summary SignatureSummary
+	if err := json.Unmarshal([]byte(raw), &summary); err != nil {
+		return nil, fmt.Errorf("unmarshal signature summary: %w", err)
+	}
+	return &summary, nil
+}
+
 // ListImports returns imports for one driver, newest first.
 func (d *DB) ListImports(ctx context.Context, cardNumber string) ([]ImportInfo, error) {
 	const q = `

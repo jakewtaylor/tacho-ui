@@ -46,6 +46,10 @@ export function GetGnssPoints(arg1) {
   return window['go']['main']['App']['GetGnssPoints'](arg1);
 }
 
+export function GetLatestSignatureSummary(arg1) {
+  return window['go']['main']['App']['GetLatestSignatureSummary'](arg1);
+}
+
 export function GetLoadTypeEntries(arg1) {
   return window['go']['main']['App']['GetLoadTypeEntries'](arg1);
 }

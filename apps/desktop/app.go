@@ -349,6 +349,18 @@ func (a *App) GetLoadTypeEntries(cardNumber string) ([]db.LoadTypeEntry, error) 
 	return store.GetLoadTypeEntries(a.ctx, cardNumber)
 }
 
+// GetLatestSignatureSummary returns the signature-verification summary
+// from the most recent .ddd import for the given driver, or null if
+// the driver has no imports or the summary is empty (e.g. imported
+// before B.5 / with no verifier configured at parse time).
+func (a *App) GetLatestSignatureSummary(cardNumber string) (*db.SignatureSummary, error) {
+	store, err := a.store()
+	if err != nil {
+		return nil, err
+	}
+	return store.GetLatestSignatureSummary(a.ctx, cardNumber)
+}
+
 // ===== Misc =====
 
 // WipeDatabase deletes every imported row and VACUUMs. Intended for testing —

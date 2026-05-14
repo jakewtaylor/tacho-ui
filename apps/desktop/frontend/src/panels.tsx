@@ -95,12 +95,19 @@ export function driverSummaryFromProfile(
   return out;
 }
 
-export function DriverSummaryPanel({ summary }: { summary: Summary[] }) {
+export function DriverSummaryPanel({
+  summary,
+  action,
+}: {
+  summary: Summary[];
+  action?: ReactNode;
+}) {
   if (summary.length === 0) return null;
   return (
     <Card>
       <CardHeader className="border-b">
         <CardTitle>Driver</CardTitle>
+        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent className="px-0">
         <Table>
