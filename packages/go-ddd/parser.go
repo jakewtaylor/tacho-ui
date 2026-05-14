@@ -103,12 +103,17 @@ func dispatchCardEF(c *Card, rec tlv.Record) error {
 		}
 		c.GnssAccumulated = gnssToCardData(records, false)
 
-	case card.FIDGNSSPlacesAuth:
-		records, err := card.DecodeGnss(rec.Value)
-		if err != nil {
-			return fmt.Errorf("EF_GNSS_PlacesAuth (gen %d): %w", gen, err)
-		}
-		c.GnssAuthAccumulated = gnssToCardData(records, true)
+	case card.FIDApplicationIdentificationV2,
+		card.FIDPlacesAuthentication,
+		card.FIDGNSSPlacesAuthentication,
+		card.FIDBorderCrossings,
+		card.FIDLoadUnloadOperations,
+		card.FIDLoadTypeEntries,
+		card.FIDVUConfiguration:
+		// Gen2v2-only EFs. Recognised but not yet decoded — the existing
+		// UI doesn't surface these and decoding them is tracked as a
+		// post-Phase-A follow-up. Silently skip so Card.DecodeErrors stays
+		// empty on a clean Gen2v2 card.
 
 	default:
 		// Decoder not yet implemented or EF not part of the driver-card

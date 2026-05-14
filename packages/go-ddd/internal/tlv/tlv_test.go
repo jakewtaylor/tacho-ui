@@ -78,16 +78,16 @@ func TestReadOversizeLength(t *testing.T) {
 }
 
 func TestTypePredicates(t *testing.T) {
-	if !TypeData.IsData() || !TypeDataGen2.IsData() || !TypeDataGen2v2.IsData() {
+	if !TypeData.IsData() || !TypeDataGen2.IsData() {
 		t.Errorf("data predicates wrong")
 	}
-	if !TypeSignature.IsSignature() || !TypeSignatureG2.IsSignature() || !TypeSignatureG2v.IsSignature() {
+	if !TypeSignature.IsSignature() || !TypeSignatureG2.IsSignature() {
 		t.Errorf("signature predicates wrong")
 	}
 	if TypeData.IsSignature() || TypeSignature.IsData() {
 		t.Errorf("data/signature predicates overlap")
 	}
-	if TypeData.Generation() != 1 || TypeDataGen2.Generation() != 2 || TypeDataGen2v2.Generation() != 22 {
+	if TypeData.Generation() != 1 || TypeDataGen2.Generation() != 2 {
 		t.Errorf("generation map wrong")
 	}
 }

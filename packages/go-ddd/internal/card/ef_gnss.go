@@ -8,8 +8,8 @@ import (
 	"github.com/jakewtaylor/go-ddd/internal/primitives"
 )
 
-// GnssRecord is one decoded GNSS sample from EF_GNSS_Places or
-// EF_GNSS_Places_Auth (Gen2 / Gen2v2 only).
+// GnssRecord is one decoded GNSS sample from EF_GNSS_Places (Gen2) or
+// EF_GNSS_Places_Authentication (Gen2v2).
 type GnssRecord struct {
 	TimeStamp time.Time
 	Latitude  float64 // decimal degrees, +N / -S
@@ -17,20 +17,29 @@ type GnssRecord struct {
 	Odometer  int     // km
 }
 
-// GnssRecord byte layout (Appendix 1 §2.79 GNSSAccumulatedDrivingRecord):
+// GNSSAccumulatedDrivingRecord byte layout (Reg. 2016/799 Annex IC
+// App. 1 §2.79 + §2.79b):
 //
-//	TimeReal              timeStamp        — 4 bytes (outer record timestamp)
-//	GNSSPlaceRecord       gnssPlaceRecord  — 13 bytes:
-//	    TimeReal             timeStamp     — 4 bytes (GNSS fix timestamp)
-//	    GNSSAccuracy         accuracy      — 1 byte
-//	    GeoCoordinates       coords        — 8 bytes (4-byte lat + 4-byte lng)
-//	OdometerShort         odometer         — 3 bytes
+//	TimeReal           timeStamp        — 4 bytes  (outer record timestamp,
+//	                                                  written when accumulated
+//	                                                  driving reaches a multiple
+//	                                                  of three hours)
+//	GNSSPlaceRecord    gnssPlaceRecord  — 11 bytes:
+//	    TimeReal           timeStamp    — 4 bytes (GNSS fix timestamp)
+//	    GNSSAccuracy       accuracy     — 1 byte  (App. 1 §2.77)
+//	    GeoCoordinates     coords       — 6 bytes (lat 3 + lng 3, signed,
+//	                                                App. 1 §2.76)
+//	OdometerShort      vehicleOdometer  — 3 bytes (App. 1 §2.113)
 //
-// Total: 4 + 13 + 3 = 20 bytes per record.
-const gnssRecordLen = 20
+// Total: 4 + 11 + 3 = 18 bytes per record.
+//
+// The cyclic buffer holds NoOfGNSSADRecords = 336 records on a Gen2v2
+// driver card (2021/1228 §TCS_155 n8), preceded by a 2-byte pointer to
+// the newest slot.
+const gnssRecordLen = 18
 
-// DecodeGnss parses an EF_GNSS_Places body. Layout: 2-byte pointer to
-// newest + cyclic array of fixed-size records.
+// DecodeGnss parses an EF_GNSS_Places body. Pointer is 2 bytes,
+// followed by a fixed cyclic array of 18-byte records.
 func DecodeGnss(body []byte) ([]GnssRecord, error) {
 	if len(body) < 2 {
 		return nil, fmt.Errorf("card: EF_GNSS_Places body too short: %d bytes", len(body))
@@ -38,21 +47,17 @@ func DecodeGnss(body []byte) ([]GnssRecord, error) {
 	pointer := int(binary.BigEndian.Uint16(body[:2]))
 	arr := body[2:]
 	if len(arr)%gnssRecordLen != 0 {
-		// Some readers may use a 1-byte pointer; retry with that.
-		pointer = int(body[0])
-		arr = body[1:]
-		if len(arr)%gnssRecordLen != 0 {
-			return nil, fmt.Errorf("card: EF_GNSS_Places array length %d not a multiple of %d",
-				len(arr), gnssRecordLen)
-		}
+		return nil, fmt.Errorf("card: EF_GNSS_Places array length %d not a multiple of %d",
+			len(arr), gnssRecordLen)
 	}
 	count := len(arr) / gnssRecordLen
+	if count == 0 {
+		return nil, nil
+	}
 	if pointer >= count {
 		pointer = count - 1
-		if pointer < 0 {
-			pointer = 0
-		}
 	}
+
 	out := make([]GnssRecord, 0, count)
 	for i := 1; i <= count; i++ {
 		idx := (pointer + i) % count
@@ -76,18 +81,17 @@ func decodeOneGnss(slot []byte) (GnssRecord, bool, error) {
 	if outerTS.IsZero() {
 		return GnssRecord{}, false, nil
 	}
-	// gnssPlaceRecord starts at offset 4: timeStamp (4) + accuracy (1) + coords (8) = 13 bytes
-	// Inner timestamp at slot[4:8] (currently unused — we trust the outer one).
-	// accuracy at slot[8] (also unused).
-	latRaw, err := primitives.Int32BE(slot[9:13])
+	// Inner timestamp at slot[4:8] (currently unused — outer is canonical).
+	// Accuracy at slot[8] (also unused).
+	latRaw, err := primitives.Int24BE(slot[9:12])
 	if err != nil {
 		return GnssRecord{}, false, fmt.Errorf("latitude: %w", err)
 	}
-	lngRaw, err := primitives.Int32BE(slot[13:17])
+	lngRaw, err := primitives.Int24BE(slot[12:15])
 	if err != nil {
 		return GnssRecord{}, false, fmt.Errorf("longitude: %w", err)
 	}
-	odo, err := primitives.Uint(slot[17:20])
+	odo, err := primitives.Uint(slot[15:18])
 	if err != nil {
 		return GnssRecord{}, false, fmt.Errorf("odometer: %w", err)
 	}
@@ -100,20 +104,36 @@ func decodeOneGnss(slot []byte) (GnssRecord, bool, error) {
 	}, true, nil
 }
 
-// geoCoordinateToDegrees converts the on-wire signed integer to
-// decimal degrees.
+// geoCoordinateToDegrees converts the on-wire signed integer to decimal
+// degrees, per Reg. 2016/799 Annex IC App. 1 §2.76.
 //
-// TODO(validate-against-card): the EU 2016/799 Appendix 1 §2.76 spec
-// gives the value range as -1800000..1800000 for a GeoCoordinate, which
-// corresponds to ±180°. The dictionary text describes the unit as
-// "1/10 of a degree minute" (i.e. 1/600 degree), but ±1800000 × (1/600)
-// = ±3000°, which can't be right. Using the divisor that matches the
-// value-range bound: 1800000 / 180 = 10000, so divisor = 10000.
+// The spec text: "latitude is encoded as a multiple (factor 10) of the
+// ±DDMM.M representation. longitude is encoded as a multiple (factor 10)
+// of the ±DDDMM.M representation." So the raw value N relates to
+// degrees-and-minutes as N = (DDD * 100 + MM.M) * 10, i.e.:
 //
-// This formula is consistent with the documented bounds but UNVERIFIED
-// against a real Gen2 card. When a sample is available, validate by
-// confirming that a known fix (e.g. ~51.5°N / 0°E for London) decodes
-// to the expected coordinates.
+//	deg          = |N| / 1000
+//	minutes × 10 = |N| % 1000
+//	result       = sign × (deg + (minutes × 10) / 600)
+//
+// Worked example: lat 0x00C8F5 = 51445 → 51° 44.5′ N → 51.7417° decimal,
+// which matches the sample card's first GNSS fix (UK).
+//
+// Sentinel: the spec uses ±90001 / ±180001 to indicate "no fix" — those
+// decode to nonsense degrees and callers can filter on the outer
+// TimeStamp.IsZero() check upstream.
 func geoCoordinateToDegrees(raw int32) float64 {
-	return float64(raw) / 10000.0
+	if raw == 0 {
+		return 0
+	}
+	sign := 1.0
+	abs := int64(raw)
+	if abs < 0 {
+		sign = -1.0
+		abs = -abs
+	}
+	deg := abs / 1000
+	minutesTenths := abs - deg*1000 // 0..999, i.e. minutes × 10
+	return sign * (float64(deg) + float64(minutesTenths)/600.0)
 }
+

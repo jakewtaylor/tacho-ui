@@ -7,26 +7,37 @@ import (
 	"time"
 )
 
+// putInt24BE writes a signed 24-bit integer as 3 big-endian bytes.
+func putInt24BE(dst []byte, v int32) {
+	u := uint32(v) & 0x00FFFFFF
+	dst[0] = byte(u >> 16)
+	dst[1] = byte(u >> 8)
+	dst[2] = byte(u)
+}
+
+// makeGnssSlot builds an 18-byte GNSSAccumulatedDrivingRecord per
+// App. 1 §2.79: TimeReal(4) + GNSSPlaceRecord(11) + OdometerShort(3).
 func makeGnssSlot(ts time.Time, latRaw, lngRaw int32, odo uint32) []byte {
 	buf := make([]byte, gnssRecordLen)
-	binary.BigEndian.PutUint32(buf[0:4], uint32(ts.Unix()))
-	binary.BigEndian.PutUint32(buf[4:8], uint32(ts.Unix())) // inner timestamp same as outer
-	buf[8] = 0                                              // accuracy
-	binary.BigEndian.PutUint32(buf[9:13], uint32(latRaw))
-	binary.BigEndian.PutUint32(buf[13:17], uint32(lngRaw))
-	buf[17] = byte(odo >> 16)
-	buf[18] = byte(odo >> 8)
-	buf[19] = byte(odo)
+	binary.BigEndian.PutUint32(buf[0:4], uint32(ts.Unix())) // outer TimeReal
+	binary.BigEndian.PutUint32(buf[4:8], uint32(ts.Unix())) // inner TimeReal
+	buf[8] = 0                                              // GNSSAccuracy
+	putInt24BE(buf[9:12], latRaw)                           // latitude
+	putInt24BE(buf[12:15], lngRaw)                          // longitude
+	buf[15] = byte(odo >> 16)                               // OdometerShort
+	buf[16] = byte(odo >> 8)
+	buf[17] = byte(odo)
 	return buf
 }
 
 func TestDecodeGnss(t *testing.T) {
 	ts := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 	body := []byte{0x00, 0x01} // 2-byte pointer = 1 (second slot is newest)
-	// slot 0: empty
+	// slot 0: empty (zero timestamp — skipped)
 	body = append(body, make([]byte, gnssRecordLen)...)
-	// slot 1: London-ish (lat ~51.5°N, lng ~-0.1°E)
-	body = append(body, makeGnssSlot(ts, 515000, -1000, 100000)...)
+	// slot 1: London-ish. 51° 30.0′ N = (51×100 + 30) × 10 = 51300.
+	//         0° 06.0′ W = (0×100 + 6) × 10 = 60, negated → -60.
+	body = append(body, makeGnssSlot(ts, 51300, -60, 100000)...)
 
 	got, err := DecodeGnss(body)
 	if err != nil {
@@ -46,5 +57,27 @@ func TestDecodeGnss(t *testing.T) {
 	}
 	if got[0].Odometer != 100000 {
 		t.Errorf("Odometer = %d, want 100000", got[0].Odometer)
+	}
+}
+
+// TestGeoCoordinateWorkedExample pins the conversion against the first
+// GNSS record from the sample card.
+//
+// raw = (DDD * 100 + MM.M) * 10, so the decode peels off integer
+// degrees with /1000 and reads minutes-tenths from the remainder.
+//
+//   - 51445  →  51° 44.5′ N  →  51.7417° decimal  (matches sample card)
+//   - -1118  →  −1° 11.8′ E  →  −1.1967° decimal  (Bristol/Bath area UK,
+//     plausible for the sample driver)
+func TestGeoCoordinateWorkedExample(t *testing.T) {
+	got := geoCoordinateToDegrees(51445)
+	want := 51 + 44.5/60.0
+	if math.Abs(got-want) > 1e-6 {
+		t.Errorf("geoCoordinateToDegrees(51445) = %v, want %v", got, want)
+	}
+	got = geoCoordinateToDegrees(-1118)
+	want = -(1 + 11.8/60.0)
+	if math.Abs(got-want) > 1e-6 {
+		t.Errorf("geoCoordinateToDegrees(-1118) = %v, want %v", got, want)
 	}
 }

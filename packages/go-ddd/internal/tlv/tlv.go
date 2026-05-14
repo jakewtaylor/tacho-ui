@@ -35,37 +35,36 @@ import (
 type Type byte
 
 const (
-	TypeData         Type = 0x00 // first-generation raw EF data
-	TypeSignature    Type = 0x01 // first-generation signature over preceding data record
-	TypeDataGen2     Type = 0x02 // second-generation raw EF data
-	TypeSignatureG2  Type = 0x03 // second-generation signature
-	TypeDataGen2v2   Type = 0x04 // second-generation v2 raw EF data (Reg. 2021/1228)
-	TypeSignatureG2v Type = 0x05 // second-generation v2 signature
+	TypeData        Type = 0x00 // first-generation raw EF data
+	TypeSignature   Type = 0x01 // first-generation signature over preceding data record
+	TypeDataGen2    Type = 0x02 // second-generation raw EF data
+	TypeSignatureG2 Type = 0x03 // second-generation signature
 )
 
-// IsData reports whether the record carries an EF body (any of the
-// generation-specific data variants).
+// IsData reports whether the record carries an EF body.
 func (t Type) IsData() bool {
-	return t == TypeData || t == TypeDataGen2 || t == TypeDataGen2v2
+	return t == TypeData || t == TypeDataGen2
 }
 
 // IsSignature reports whether the record is a signature wrapper over the
 // immediately preceding data record.
 func (t Type) IsSignature() bool {
-	return t == TypeSignature || t == TypeSignatureG2 || t == TypeSignatureG2v
+	return t == TypeSignature || t == TypeSignatureG2
 }
 
-// Generation reports which card generation the record originated from.
-// 1 for first-generation data/sig, 2 for second-generation v1, 22 for
-// second-generation v2 (the encoding used by EU 2021/1228 amendments).
+// Generation reports which card generation the record originated from
+// based on the TLV type byte. Note that the on-wire type byte does NOT
+// distinguish Gen2 v1 from Gen2 v2 — both emit type 0x02 / 0x03 (2016/799
+// App. 7 §3.2 and 2021/1228 §TCS_152, which did not introduce a new
+// type byte). The version-2 status of a card is determined by
+// cardStructureVersion = {01 01} in EF_Application_Identification, not
+// by the TLV framing.
 func (t Type) Generation() int {
 	switch t {
 	case TypeData, TypeSignature:
 		return 1
 	case TypeDataGen2, TypeSignatureG2:
 		return 2
-	case TypeDataGen2v2, TypeSignatureG2v:
-		return 22
 	}
 	return 0
 }

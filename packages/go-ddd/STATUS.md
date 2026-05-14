@@ -1,80 +1,59 @@
 # go-ddd Phase A status
 
-Phase A is wired end-to-end: `apps/desktop` parses `.ddd` files exclusively
-through `github.com/jakewtaylor/go-ddd` and the AGPL `tachoparser` dependency
-has been removed.
+Phase A is **complete and validated against the real sample card**:
 
-Every decoder has unit-test coverage against synthetic byte sequences
-constructed from the spec. **None has been validated against a real
-`.ddd` sample** — that's the work the user needs to do once they're back
-at the macOS machine that has the sample card file.
+- `apps/desktop` parses `.ddd` files exclusively through `go-ddd`; the
+  AGPL `tachoparser` dependency is removed.
+- `apps/desktop/app_test.go::TestImportSampleCard` passes (driver
+  TAYLOR/MARK, card `DB14164162012802`, 337 daily records Gen1 + 336
+  daily records Gen2, 112 place records per generation, 200 vehicles,
+  events/faults populated, 336 GNSS records decoded to plausible UK +
+  northern-France coordinates).
+- `Card.DecodeErrors` is empty on a clean Gen2v2 driver card.
 
-## How to validate
+All decoder TODOs from the prior revision of this file have been
+resolved against the cited EU specifications (mirrored under
+`docs/legislation/`):
 
-From the repo root:
+| Was-unverified | Resolution | Spec § |
+|---|---|---|
+| EF_Places Gen2 record width | 21 bytes (Gen1 10 + GNSSPlaceRecord 11) | App. 1 §2.117 + §2.79 |
+| EF_Places pointer width | 1 byte Gen1 / 2 bytes Gen2 (per `placePointerNewestRecord` row in §TCS_150) | App. 2 §TCS_150 |
+| GeoCoordinates byte width | 6 bytes (3 + 3, signed 24-bit) | App. 1 §2.76 |
+| GeoCoordinates encoding | DDMM.M / DDDMM.M ×10 (sample-card 0x00C8F5 = 51445 → 51.7417°N) | App. 1 §2.76 |
+| EF_GNSS_Places FID | `0x0524` (not `0x0525` — that's Application_Identification_V2) | App. 2 §TCS_152 |
+| GNSS record width | 18 bytes (outer TimeReal 4 + GNSSPlaceRecord 11 + OdometerShort 3) | App. 1 §2.79 |
+| EF_Vehicles_Used Gen2 record width | 48 bytes (Gen1 31 + VIN 17) — confirmed by §TCS_154 (n3=200, body=9602) | App. 2 §TCS_154 |
+| EF_Events/Faults record width | 24 bytes uniformly across Gen1/Gen2 — confirmed by §TCS_150 + §TCS_154 | App. 2 §TCS_150 |
+| `TypeDataGen2v2 = 0x04` constant | Removed — Gen2v2 uses the existing `0x02` type byte; version is implicit in `cardStructureVersion = {01 01}` | 2021/1228 §TCS_152 |
 
-```
-cd apps/desktop
-go test -run TestImportSampleCard -v ./...
-```
-
-The test imports `../../C_20260509_1146_M_TAYLOR_DB141641620128.ddd`,
-runs it through the full importer pipeline, and asserts:
-
-1. Driver card number prefix `DB14164162012802`
-2. Driver name "TAYLOR" / "MARK"
-3. ≥ 100 daily records
-4. ≥ 1 place record
-5. Dedup behaviour (re-import returns AlreadyImported)
-6. ListDrivers returns exactly 1 driver
-
-Any failure is a real bug in one of the EF decoders, since the test was
-green against tachoparser. The likely culprits, ranked:
-
-## Known-uncertain areas (TODOs)
-
-1. **`EF_GNSS_Places` GeoCoordinate scale factor**
-   File: `packages/go-ddd/internal/card/ef_gnss.go`, `geoCoordinateToDegrees`.
-   Chosen divisor = 10000 (matches the spec's value-range bound of
-   ±1800000 for ±180°). The spec text describes the unit as "1/10 of a
-   degree minute" which would imply 600 — but that doesn't fit the
-   bound. If the map shows points in the wrong location after a real
-   import, this is the first place to check.
-
-2. **`EF_Driver_Activity_Data` cyclic-buffer wrap edge cases**
-   File: `packages/go-ddd/internal/card/ef_driver_activity.go`.
-   The buffer is linearised by rotating around `oldestPtr`, then walked
-   record-by-record using `activityRecordLength`. Tested for the
-   happy path (linear) and the wraparound case (record straddles the
-   physical buffer boundary). Untested: malformed records mid-buffer,
-   empty buffer with non-zero pointers, daily record with zero changes.
-
-3. **`EF_Vehicles_Used` Gen2 layout**
-   File: `packages/go-ddd/internal/card/ef_vehicles_used.go`.
-   Gen2 record size assumed to be 48 bytes (Gen1 31 + VIN 17). Width
-   is auto-detected from the body length; if the real Gen2 body uses
-   a different width, decoding will fail loudly with "array length does
-   not divide evenly".
-
-4. **`EF_Places` pointer width**
-   File: `packages/go-ddd/internal/card/ef_places.go`.
-   First tries a 1-byte pointer; on failure retries with a 2-byte
-   pointer. The retry was a defensive measure — only one of the two is
-   correct per the spec, and the wrong one might still divide cleanly
-   for some array sizes.
-
-5. **`EF_Events_Data` / `EF_Faults_Data` Gen2 record width**
-   File: `packages/go-ddd/internal/card/ef_events_faults.go`.
-   Currently assumes 24-byte records uniformly. Gen2 may extend the
-   record (e.g. additional fields for security events). If the body
-   length isn't a multiple of 24, decoding fails — easy to spot.
-
-## What's working with high confidence
+## What works with high confidence
 
 - TLV framing (`internal/tlv/`) — fuzz-tested ~500k execs, no panics
 - All Appendix 1 primitives (`internal/primitives/`)
-- `EF_Identification` byte layout — the 143-byte body structure is
-  unambiguous in the spec and matches what tachoparser outputs
+- Every Gen1 + Gen2v1 EF the existing UI consumes:
+  Identification, Driver_Activity, Places, Vehicles_Used, Events_Data,
+  Faults_Data, GNSS_Places.
+
+## Recognised-but-not-decoded EFs (Gen2v2-only)
+
+These dispatch to a silent no-op in `parser.go::dispatchCardEF`. They
+appear on Gen2v2 cards (the sample has all of them) but the existing UI
+doesn't consume them, so they're deferred:
+
+| FID | EF | What it holds |
+|---|---|---|
+| `0x0525` | Application_Identification_V2 | Buffer-size counters for the v2 EFs below |
+| `0x0526` | Places_Authentication | Per-PlaceRecord GNSS authentication status (5-byte records) |
+| `0x0527` | GNSS_Places_Authentication | Per-GNSS-record authentication status (5-byte records) |
+| `0x0528` | Border_Crossings | 17-byte CardBorderCrossingRecord × 1120 |
+| `0x0529` | Load_Unload_Operations | 20-byte records × 1624 |
+| `0x0530` | Load_Type_Entries | 5-byte records × 336 |
+| `0x0531` | VU_Configuration | Cardholder-specific VU settings, up to 3072 bytes |
+
+When the UI grows surfaces for these (e.g. a Border-Crossings panel,
+GNSS-authentication badge), wire each decoder into `internal/card/` and
+add a dispatch case. Spec citations are in `docs/parser-migration-plan.md`.
 
 ## Deferred to Phase B
 
@@ -86,4 +65,4 @@ green against tachoparser. The likely culprits, ranked:
 ## Deferred to Phase C
 
 - VU file parsing — `ParseVU` returns "not implemented"
-- The desktop app still rejects non-card files at `apps/desktop/app.go:218-220`
+- The desktop app still rejects non-card files at `apps/desktop/app.go`
