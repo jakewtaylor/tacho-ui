@@ -3,6 +3,8 @@ import { useRouteLoaderData } from "react-router-dom";
 
 import {
   ActivityPanel,
+  BorderCrossingsPanel,
+  CargoPanel,
   DriverSummaryPanel,
   EventsPanel,
   ShiftsPanel,
@@ -33,6 +35,11 @@ export function Overview() {
         cardNumber={data.cardNumber}
         placeRecords={data.placeRecords}
         vehicles={data.vehicles}
+      />
+      <BorderCrossingsPanel crossings={data.borderCrossings} />
+      <CargoPanel
+        loadUnloadOps={data.loadUnloadOps}
+        loadTypeEntries={data.loadTypeEntries}
       />
       <EventsPanel events={data.events} />
     </div>

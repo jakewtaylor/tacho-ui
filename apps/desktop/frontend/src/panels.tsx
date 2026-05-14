@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { TriangleAlert } from "lucide-react";
 
@@ -39,6 +39,8 @@ import { vehicleForShift, type VehicleUsage } from "./vehicles";
 import { durationMinutes, type CardEvent } from "./events";
 import { eventCategory, eventTypeLabel } from "./eventTypes";
 import type { db } from "../wailsjs/go/models";
+
+const ROW_LIMIT = 50;
 
 export type Summary = {
   label: string;
@@ -444,6 +446,198 @@ function categoryBadgeVariant(
     default:
       return "secondary";
   }
+}
+
+function formatTimestamp(s: string): string {
+  return s.replace("T", " ").replace("Z", "");
+}
+
+function authBadge(status: string | undefined): ReactNode {
+  if (!status || status === "unknown") return null;
+  const ok = status === "authenticated";
+  return (
+    <Badge
+      variant={ok ? "secondary" : "outline"}
+      className={ok ? "font-mono text-[10px]" : "font-mono text-[10px] text-amber-500"}
+      title={ok ? "GNSS position authenticated by the VU" : "GNSS position NOT authenticated"}
+    >
+      {ok ? "✓ auth" : "⚠ unauth"}
+    </Badge>
+  );
+}
+
+function operationBadge(op: string): ReactNode {
+  const variants: Record<string, "secondary" | "outline" | "destructive"> = {
+    load: "secondary",
+    unload: "outline",
+    simultaneous: "destructive",
+    unknown: "outline",
+  };
+  return <Badge variant={variants[op] ?? "outline"}>{op}</Badge>;
+}
+
+function loadTypeBadge(t: string): ReactNode {
+  return (
+    <Badge variant="outline" className="font-mono text-xs">
+      {t}
+    </Badge>
+  );
+}
+
+export function BorderCrossingsPanel({
+  crossings,
+}: {
+  crossings: db.BorderCrossing[];
+}) {
+  const rows = useMemo(
+    () => crossings.slice(-ROW_LIMIT).reverse(),
+    [crossings],
+  );
+  if (rows.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>Border crossings</CardTitle>
+        <CardDescription>
+          Vehicle-unit-detected changes of country (Gen2v2 only).
+          {crossings.length > ROW_LIMIT
+            ? ` Showing newest ${ROW_LIMIT} of ${crossings.length}.`
+            : ` ${crossings.length} on this card.`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-4">When</TableHead>
+              <TableHead>From</TableHead>
+              <TableHead>To</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead className="pr-4 text-right">Odometer</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r, i) => (
+              <TableRow key={`${r.crossedAt}-${i}`}>
+                <TableCell className="pl-4 font-mono text-xs">
+                  {formatTimestamp(r.crossedAt)}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="font-mono">
+                    {nationAlpha(r.countryLeft)}
+                  </Badge>
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {nationName(r.countryLeft)}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="font-mono">
+                    {nationAlpha(r.countryEntered)}
+                  </Badge>
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {nationName(r.countryEntered)}
+                  </span>
+                </TableCell>
+                <TableCell className="font-mono text-xs">
+                  {r.latitude || r.longitude
+                    ? `${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}`
+                    : "—"}
+                  <span className="ml-2">{authBadge(r.authenticationStatus)}</span>
+                </TableCell>
+                <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
+                  {r.odometer.toLocaleString()} km
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function CargoPanel({
+  loadUnloadOps,
+  loadTypeEntries,
+}: {
+  loadUnloadOps: db.LoadUnloadOp[];
+  loadTypeEntries: db.LoadTypeEntry[];
+}) {
+  const ops = useMemo(
+    () => loadUnloadOps.slice(-ROW_LIMIT).reverse(),
+    [loadUnloadOps],
+  );
+  const types = useMemo(
+    () => loadTypeEntries.slice(-ROW_LIMIT).reverse(),
+    [loadTypeEntries],
+  );
+  if (ops.length === 0 && types.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>Cargo events</CardTitle>
+        <CardDescription>
+          Load/unload presses and load-type entries from the vehicle unit
+          (Gen2v2 only). {ops.length} operations, {types.length} type changes
+          on this card.
+        </CardDescription>
+      </CardHeader>
+      {ops.length > 0 && (
+        <CardContent className="px-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4">When</TableHead>
+                <TableHead>Operation</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead className="pr-4 text-right">Odometer</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ops.map((r, i) => (
+                <TableRow key={`op-${r.operationAt}-${i}`}>
+                  <TableCell className="pl-4 font-mono text-xs">
+                    {formatTimestamp(r.operationAt)}
+                  </TableCell>
+                  <TableCell>{operationBadge(r.operationType)}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {r.latitude || r.longitude
+                      ? `${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}`
+                      : "—"}
+                    <span className="ml-2">
+                      {authBadge(r.authenticationStatus)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
+                    {r.odometer.toLocaleString()} km
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      )}
+      {types.length > 0 && (
+        <CardContent className="px-0">
+          <div className="border-t px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground">
+            Load type changes
+          </div>
+          <Table>
+            <TableBody>
+              {types.map((r, i) => (
+                <TableRow key={`type-${r.enteredAt}-${i}`}>
+                  <TableCell className="pl-4 font-mono text-xs">
+                    {formatTimestamp(r.enteredAt)}
+                  </TableCell>
+                  <TableCell className="pr-4">{loadTypeBadge(r.loadType)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      )}
+    </Card>
+  );
 }
 
 export function EventsPanel({ events }: { events: CardEvent[] }) {

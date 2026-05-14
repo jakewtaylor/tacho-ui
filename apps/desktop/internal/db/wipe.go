@@ -7,14 +7,17 @@ import (
 
 // WipeStats reports how many rows of each kind were deleted by Wipe.
 type WipeStats struct {
-	Drivers       int64 `json:"drivers"`
-	Vehicles      int64 `json:"vehicles"`
-	Imports       int64 `json:"imports"`
-	DailyRecords  int64 `json:"dailyRecords"`
-	PlaceRecords  int64 `json:"placeRecords"`
-	GnssPoints    int64 `json:"gnssPoints"`
-	EventsFaults  int64 `json:"eventsFaults"`
-	DriverVehicles int64 `json:"driverVehicles"`
+	Drivers          int64 `json:"drivers"`
+	Vehicles         int64 `json:"vehicles"`
+	Imports          int64 `json:"imports"`
+	DailyRecords     int64 `json:"dailyRecords"`
+	PlaceRecords     int64 `json:"placeRecords"`
+	GnssPoints       int64 `json:"gnssPoints"`
+	EventsFaults     int64 `json:"eventsFaults"`
+	DriverVehicles   int64 `json:"driverVehicles"`
+	BorderCrossings  int64 `json:"borderCrossings"`
+	LoadUnloadOps    int64 `json:"loadUnloadOps"`
+	LoadTypeEntries  int64 `json:"loadTypeEntries"`
 }
 
 // Wipe deletes every row from every data table (in FK-dependency order, inside
@@ -39,6 +42,9 @@ func (d *DB) Wipe(ctx context.Context) (*WipeStats, error) {
 		{"place_records", &stats.PlaceRecords},
 		{"daily_records", &stats.DailyRecords},
 		{"driver_vehicles", &stats.DriverVehicles},
+		{"border_crossings", &stats.BorderCrossings},
+		{"load_unload_ops", &stats.LoadUnloadOps},
+		{"load_type_entries", &stats.LoadTypeEntries},
 		{"imports", &stats.Imports},
 		{"vehicles", &stats.Vehicles},
 		{"drivers", &stats.Drivers},

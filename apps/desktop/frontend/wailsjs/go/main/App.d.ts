@@ -13,6 +13,8 @@ export function DeactivateLicense():Promise<void>;
 
 export function DeleteImport(arg1:number):Promise<boolean>;
 
+export function GetBorderCrossings(arg1:string):Promise<Array<db.BorderCrossing>>;
+
 export function GetDailyRecords(arg1:string):Promise<Array<db.DailyRecord>>;
 
 export function GetDriverProfile(arg1:string):Promise<db.DriverProfile>;
@@ -22,6 +24,10 @@ export function GetDriverVehicles(arg1:string):Promise<Array<db.DriverVehicle>>;
 export function GetEventsAndFaults(arg1:string):Promise<Array<db.CardEvent>>;
 
 export function GetGnssPoints(arg1:string):Promise<Array<db.GnssPoint>>;
+
+export function GetLoadTypeEntries(arg1:string):Promise<Array<db.LoadTypeEntry>>;
+
+export function GetLoadUnloadOps(arg1:string):Promise<Array<db.LoadUnloadOp>>;
 
 export function GetPlaceRecords(arg1:string):Promise<Array<db.PlaceRecord>>;
 

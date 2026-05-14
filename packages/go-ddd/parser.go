@@ -103,17 +103,49 @@ func dispatchCardEF(c *Card, rec tlv.Record) error {
 		}
 		c.GnssAccumulated = gnssToCardData(records, false)
 
+	case card.FIDBorderCrossings:
+		records, err := card.DecodeBorderCrossings(rec.Value)
+		if err != nil {
+			return fmt.Errorf("EF_Border_Crossings (gen %d): %w", gen, err)
+		}
+		c.BorderCrossings = borderCrossingsToCardData(records)
+
+	case card.FIDLoadUnloadOperations:
+		records, err := card.DecodeLoadUnload(rec.Value)
+		if err != nil {
+			return fmt.Errorf("EF_Load_Unload_Operations (gen %d): %w", gen, err)
+		}
+		c.LoadUnloadOps = loadUnloadToCardData(records)
+
+	case card.FIDLoadTypeEntries:
+		records, err := card.DecodeLoadType(rec.Value)
+		if err != nil {
+			return fmt.Errorf("EF_Load_Type_Entries (gen %d): %w", gen, err)
+		}
+		c.LoadTypeEntries = loadTypeToCardData(records)
+
+	case card.FIDPlacesAuthentication:
+		records, err := card.DecodeAuthStatus(rec.Value)
+		if err != nil {
+			return fmt.Errorf("EF_Places_Authentication (gen %d): %w", gen, err)
+		}
+		c.PlacesAuthStatus = authStatusToCardData(records)
+
+	case card.FIDGNSSPlacesAuthentication:
+		records, err := card.DecodeAuthStatus(rec.Value)
+		if err != nil {
+			return fmt.Errorf("EF_GNSS_Places_Authentication (gen %d): %w", gen, err)
+		}
+		c.GnssPlacesAuthStatus = authStatusToCardData(records)
+
 	case card.FIDApplicationIdentificationV2,
-		card.FIDPlacesAuthentication,
-		card.FIDGNSSPlacesAuthentication,
-		card.FIDBorderCrossings,
-		card.FIDLoadUnloadOperations,
-		card.FIDLoadTypeEntries,
 		card.FIDVUConfiguration:
-		// Gen2v2-only EFs. Recognised but not yet decoded — the existing
-		// UI doesn't surface these and decoding them is tracked as a
-		// post-Phase-A follow-up. Silently skip so Card.DecodeErrors stays
-		// empty on a clean Gen2v2 card.
+		// Recognised but deliberately skipped. Application_Identification_V2
+		// is just buffer-size counters that the parser doesn't expose;
+		// VU_Configuration is a placeholder file (2021/1228 §TCS_152
+		// note: "the vehicle unit shall ignore the elementary file
+		// EF VU_Configuration in all cards insofar as no specific rules
+		// have been provided").
 
 	default:
 		// Decoder not yet implemented or EF not part of the driver-card
@@ -314,6 +346,71 @@ func gnssToCardData(records []card.GnssRecord, isAuth bool) *GnssData {
 		out.GnssAuthAccumulatedDrivingRecords = dst
 	} else {
 		out.GnssAccumulatedDrivingRecords = dst
+	}
+	return out
+}
+
+// --- Gen2v2 adapters ----------------------------------------------------
+
+func borderCrossingsToCardData(records []card.BorderCrossingRecord) *BorderCrossingsData {
+	out := &BorderCrossingsData{
+		CardBorderCrossingRecords: make([]BorderCrossingRecord, 0, len(records)),
+	}
+	for _, r := range records {
+		out.CardBorderCrossingRecords = append(out.CardBorderCrossingRecords, BorderCrossingRecord{
+			CountryLeft:    r.CountryLeft,
+			CountryEntered: r.CountryEntered,
+			TimeStamp:      r.GnssPlaceAuth.TimeStamp,
+			GeoCoordinates: &GeoCoordinates{
+				Latitude:  r.GnssPlaceAuth.Latitude,
+				Longitude: r.GnssPlaceAuth.Longitude,
+			},
+			AuthenticationStatus: r.GnssPlaceAuth.AuthStatus.String(),
+			VehicleOdometerValue: r.Odometer,
+		})
+	}
+	return out
+}
+
+func loadUnloadToCardData(records []card.LoadUnloadRecord) *LoadUnloadData {
+	out := &LoadUnloadData{
+		CardLoadUnloadRecords: make([]LoadUnloadRecord, 0, len(records)),
+	}
+	for _, r := range records {
+		out.CardLoadUnloadRecords = append(out.CardLoadUnloadRecords, LoadUnloadRecord{
+			TimeStamp:     r.TimeStamp,
+			OperationType: r.OperationType.String(),
+			GeoCoordinates: &GeoCoordinates{
+				Latitude:  r.GnssPlaceAuth.Latitude,
+				Longitude: r.GnssPlaceAuth.Longitude,
+			},
+			AuthenticationStatus: r.GnssPlaceAuth.AuthStatus.String(),
+			VehicleOdometerValue: r.Odometer,
+		})
+	}
+	return out
+}
+
+func loadTypeToCardData(records []card.LoadTypeEntry) *LoadTypeData {
+	out := &LoadTypeData{
+		CardLoadTypeEntryRecords: make([]LoadTypeEntry, 0, len(records)),
+	}
+	for _, r := range records {
+		out.CardLoadTypeEntryRecords = append(out.CardLoadTypeEntryRecords, LoadTypeEntry{
+			TimeStamp: r.TimeStamp,
+			LoadType:  r.LoadType.String(),
+		})
+	}
+	return out
+}
+
+func authStatusToCardData(records []card.AuthStatusEntry) []AuthStatusEntry {
+	out := make([]AuthStatusEntry, 0, len(records))
+	for _, r := range records {
+		out = append(out, AuthStatusEntry{
+			TimeStamp:            r.TimeStamp,
+			AuthenticationStatus: r.AuthStatus.String(),
+		})
 	}
 	return out
 }

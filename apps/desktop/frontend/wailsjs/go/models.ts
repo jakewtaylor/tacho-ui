@@ -20,6 +20,30 @@ export namespace db {
 	        this.minutes = source["minutes"];
 	    }
 	}
+	export class BorderCrossing {
+	    crossedAt: string;
+	    countryLeft: number;
+	    countryEntered: number;
+	    latitude: number;
+	    longitude: number;
+	    authenticationStatus?: string;
+	    odometer: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BorderCrossing(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.crossedAt = source["crossedAt"];
+	        this.countryLeft = source["countryLeft"];
+	        this.countryEntered = source["countryEntered"];
+	        this.latitude = source["latitude"];
+	        this.longitude = source["longitude"];
+	        this.authenticationStatus = source["authenticationStatus"];
+	        this.odometer = source["odometer"];
+	    }
+	}
 	export class CardEvent {
 	    kind: string;
 	    type: number;
@@ -169,6 +193,7 @@ export namespace db {
 	    latitude: number;
 	    longitude: number;
 	    odometer: number;
+	    authenticationStatus?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new GnssPoint(source);
@@ -180,6 +205,7 @@ export namespace db {
 	        this.latitude = source["latitude"];
 	        this.longitude = source["longitude"];
 	        this.odometer = source["odometer"];
+	        this.authenticationStatus = source["authenticationStatus"];
 	    }
 	}
 	export class ImportInfo {
@@ -226,12 +252,49 @@ export namespace db {
 	        this.counts = source["counts"];
 	    }
 	}
+	export class LoadTypeEntry {
+	    enteredAt: string;
+	    loadType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadTypeEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enteredAt = source["enteredAt"];
+	        this.loadType = source["loadType"];
+	    }
+	}
+	export class LoadUnloadOp {
+	    operationAt: string;
+	    operationType: string;
+	    latitude: number;
+	    longitude: number;
+	    authenticationStatus?: string;
+	    odometer: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadUnloadOp(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.operationAt = source["operationAt"];
+	        this.operationType = source["operationType"];
+	        this.latitude = source["latitude"];
+	        this.longitude = source["longitude"];
+	        this.authenticationStatus = source["authenticationStatus"];
+	        this.odometer = source["odometer"];
+	    }
+	}
 	export class PlaceRecord {
 	    entry_time: string;
 	    entry_type_daily_work_period: number;
 	    daily_work_period_country: number;
 	    daily_work_period_region: number;
 	    vehicle_odometer_value: number;
+	    authentication_status?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PlaceRecord(source);
@@ -244,6 +307,7 @@ export namespace db {
 	        this.daily_work_period_country = source["daily_work_period_country"];
 	        this.daily_work_period_region = source["daily_work_period_region"];
 	        this.vehicle_odometer_value = source["vehicle_odometer_value"];
+	        this.authentication_status = source["authentication_status"];
 	    }
 	}
 	export class WipeStats {
@@ -255,6 +319,9 @@ export namespace db {
 	    gnssPoints: number;
 	    eventsFaults: number;
 	    driverVehicles: number;
+	    borderCrossings: number;
+	    loadUnloadOps: number;
+	    loadTypeEntries: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new WipeStats(source);
@@ -270,6 +337,9 @@ export namespace db {
 	        this.gnssPoints = source["gnssPoints"];
 	        this.eventsFaults = source["eventsFaults"];
 	        this.driverVehicles = source["driverVehicles"];
+	        this.borderCrossings = source["borderCrossings"];
+	        this.loadUnloadOps = source["loadUnloadOps"];
+	        this.loadTypeEntries = source["loadTypeEntries"];
 	    }
 	}
 
