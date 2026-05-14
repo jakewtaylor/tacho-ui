@@ -1,8 +1,14 @@
-// NationNumeric → country name, per EU Regulation 2016/799 Annex IC Appendix 1
-// section 2.101. Confirmed against our sample: card driving_licence_issuing_authority
-// is "DVLA" (UK) with nation code 21 → United Kingdom.
+// NationNumeric → country name, per Commission Regulation (EC) 1360/2002
+// Annex IB §2.72 (the canonical value-list 2016/799 Annex IC App. 1 §2.100
+// defers to). The list runs 0..0x33 (51) with 0x34..0xFC marked "RFU";
+// special codes 0xFD–0xFF cover supranational / unspecified categories.
 //
-// Special codes (0xFD–0xFF) cover supranational / unspecified categories.
+// Codes >= 52 are post-2002 additions maintained by the JRC laboratory
+// (Annex IC §2.100 refers to "the list maintained on the website of the
+// laboratory appointed to carry out interoperability testing"). They
+// don't appear in our sample card; values below are best-effort from
+// public references and may need verification if a real card surfaces
+// one.
 
 const NATIONS: Record<number, { name: string; alpha: string }> = {
   0: { name: "No country", alpha: "—" },
@@ -25,7 +31,7 @@ const NATIONS: Record<number, { name: string; alpha: string }> = {
   17: { name: "France", alpha: "F" },
   18: { name: "Finland", alpha: "FIN" },
   19: { name: "Liechtenstein", alpha: "FL" },
-  20: { name: "Faroe Islands", alpha: "FR" },
+  20: { name: "Faeroe Islands", alpha: "FR" },
   21: { name: "United Kingdom", alpha: "GB" },
   22: { name: "Georgia", alpha: "GE" },
   23: { name: "Greece", alpha: "GR" },
@@ -39,28 +45,31 @@ const NATIONS: Record<number, { name: string; alpha: string }> = {
   31: { name: "Lithuania", alpha: "LT" },
   32: { name: "Latvia", alpha: "LV" },
   33: { name: "Malta", alpha: "M" },
-  34: { name: "Republic of Moldova", alpha: "MD" },
-  35: { name: "North Macedonia", alpha: "MK" },
-  36: { name: "Norway", alpha: "N" },
-  37: { name: "Netherlands", alpha: "NL" },
-  38: { name: "Portugal", alpha: "P" },
-  39: { name: "Poland", alpha: "PL" },
-  40: { name: "Romania", alpha: "RO" },
-  41: { name: "San Marino", alpha: "RSM" },
-  42: { name: "Russian Federation", alpha: "RUS" },
-  43: { name: "Sweden", alpha: "S" },
-  44: { name: "Slovakia", alpha: "SK" },
-  45: { name: "Slovenia", alpha: "SLO" },
-  46: { name: "Turkmenistan", alpha: "TM" },
-  47: { name: "Turkey", alpha: "TR" },
-  48: { name: "Ukraine", alpha: "UA" },
-  49: { name: "Vatican City", alpha: "V" },
-  50: { name: "Yugoslavia", alpha: "YU" },
-  51: { name: "Serbia", alpha: "SRB" },
+  34: { name: "Monaco", alpha: "MC" },
+  35: { name: "Republic of Moldova", alpha: "MD" },
+  36: { name: "North Macedonia", alpha: "MK" },
+  37: { name: "Norway", alpha: "N" },
+  38: { name: "Netherlands", alpha: "NL" },
+  39: { name: "Portugal", alpha: "P" },
+  40: { name: "Poland", alpha: "PL" },
+  41: { name: "Romania", alpha: "RO" },
+  42: { name: "San Marino", alpha: "RSM" },
+  43: { name: "Russian Federation", alpha: "RUS" },
+  44: { name: "Sweden", alpha: "S" },
+  45: { name: "Slovakia", alpha: "SK" },
+  46: { name: "Slovenia", alpha: "SLO" },
+  47: { name: "Turkmenistan", alpha: "TM" },
+  48: { name: "Turkey", alpha: "TR" },
+  49: { name: "Ukraine", alpha: "UA" },
+  50: { name: "Vatican City", alpha: "V" },
+  51: { name: "Yugoslavia / Serbia", alpha: "YU" },
+  // Post-2002 JRC additions (codes >= 52). Best-effort, not validated
+  // against a real card.
   52: { name: "Montenegro", alpha: "MNE" },
-  53: { name: "Tajikistan", alpha: "TJ" },
-  54: { name: "Uzbekistan", alpha: "UZ" },
-  55: { name: "Kyrgyzstan", alpha: "KS" },
+  53: { name: "Serbia", alpha: "SRB" },
+  54: { name: "Tajikistan", alpha: "TJ" },
+  55: { name: "Uzbekistan", alpha: "UZ" },
+  56: { name: "Kyrgyzstan", alpha: "KS" },
   0xfd: { name: "European Community", alpha: "EC" },
   0xfe: { name: "Rest of Europe", alpha: "EUR" },
   0xff: { name: "Rest of World", alpha: "WLD" },
