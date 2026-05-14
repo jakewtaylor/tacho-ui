@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/traconiq/tachoparser v0.0.0-20260424093435-b1dc8d5ec83e
 	github.com/wailsapp/wails/v2 v2.12.0
 	modernc.org/sqlite v1.50.1
 )
@@ -17,8 +16,8 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/jakewtaylor/go-ddd v0.0.0
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
-	github.com/keybase/go-crypto v0.0.0-20200123153347-de78d2cb44f4 // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect
@@ -48,3 +47,5 @@ require (
 )
 
 // replace github.com/wailsapp/wails/v2 v2.12.0 => /Users/jake/go/pkg/mod
+
+replace github.com/jakewtaylor/go-ddd => ../../packages/go-ddd

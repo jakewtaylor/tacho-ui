@@ -1,3 +1,19 @@
+// Package importer parses a .ddd file via the in-house go-ddd parser
+// and writes its contents into the SQLite store. Same file (same SHA256)
+// imported twice is a no-op; the import returns AlreadyImported=true
+// with the prior import's ID.
+//
+// Strategy:
+//   1. Hash bytes → check imports.file_sha256 → short-circuit if exists.
+//   2. Parse with ddd.ParseCard. The result is a typed ddd.Card that
+//      matches the shape of the dropped local "payload" types, so the
+//      ingestion code below consumes it directly without a JSON
+//      round-trip.
+//   3. Open a transaction. Upsert driver + vehicles, insert/replace
+//      records with INSERT OR REPLACE so re-importing a newer file from
+//      the same driver wins for overlapping (driver, date) keys without
+//      dropping historical rows from previous imports.
+//   4. Commit.
 package importer
 
 import (
@@ -10,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/traconiq/tachoparser/pkg/decoder"
+	ddd "github.com/jakewtaylor/go-ddd"
 
 	"tacho-ui/internal/db"
 )
@@ -29,7 +45,6 @@ const (
 func ImportCard(ctx context.Context, store *db.DB, filename string, data []byte) (*db.ImportResult, error) {
 	hashHex := hashBytes(data)
 
-	// Short-circuit on duplicate.
 	if existing, driver, found, err := findImportByHash(ctx, store, hashHex); err != nil {
 		return nil, err
 	} else if found {
@@ -43,28 +58,16 @@ func ImportCard(ctx context.Context, store *db.DB, filename string, data []byte)
 		}, nil
 	}
 
-	// Parse via tachoparser.
-	var c decoder.Card
-	if _, err := decoder.UnmarshalTLV(data, &c); err != nil {
-		return nil, fmt.Errorf("decode card TLV: %w", err)
-	}
-
-	// Re-marshal to JSON so we can both store a blob and re-parse into our
-	// internal shape (which is a subset of the decoder's enormous struct).
-	rawJSON, err := json.Marshal(c)
+	card, err := ddd.ParseCard(data)
 	if err != nil {
-		return nil, fmt.Errorf("marshal decoded card to json: %w", err)
-	}
-	var p cardPayload
-	if err := json.Unmarshal(rawJSON, &p); err != nil {
-		return nil, fmt.Errorf("unmarshal card payload: %w", err)
+		return nil, fmt.Errorf("decode card: %w", err)
 	}
 
-	ident := p.Identification1
-	if ident == nil || ident.CardIdentification == nil || ident.CardIdentification.CardNumber == "" {
-		ident = p.Identification2
+	ident := card.Identification1
+	if !hasUsableIdent(ident) {
+		ident = card.Identification2
 	}
-	if ident == nil || ident.CardIdentification == nil || ident.CardIdentification.CardNumber == "" {
+	if !hasUsableIdent(ident) {
 		return nil, fmt.Errorf("card has no identification record")
 	}
 	cardNumber := ident.CardIdentification.CardNumber
@@ -96,27 +99,27 @@ func ImportCard(ctx context.Context, store *db.DB, filename string, data []byte)
 
 	counts := map[string]int{}
 
-	if n, err := insertDailyRecords(ctx, tx, cardNumber, importID, &p); err != nil {
+	if n, err := insertDailyRecords(ctx, tx, cardNumber, importID, card); err != nil {
 		return nil, err
 	} else {
 		counts["daily_records"] = n
 	}
-	if n, err := insertPlaceRecords(ctx, tx, cardNumber, importID, &p); err != nil {
+	if n, err := insertPlaceRecords(ctx, tx, cardNumber, importID, card); err != nil {
 		return nil, err
 	} else {
 		counts["place_records"] = n
 	}
-	if n, err := insertVehicles(ctx, tx, cardNumber, importID, &p, now); err != nil {
+	if n, err := insertVehicles(ctx, tx, cardNumber, importID, card, now); err != nil {
 		return nil, err
 	} else {
 		counts["driver_vehicles"] = n
 	}
-	if n, err := insertGnssPoints(ctx, tx, cardNumber, importID, &p); err != nil {
+	if n, err := insertGnssPoints(ctx, tx, cardNumber, importID, card); err != nil {
 		return nil, err
 	} else {
 		counts["gnss_points"] = n
 	}
-	if n, err := insertEventsFaults(ctx, tx, cardNumber, importID, &p); err != nil {
+	if n, err := insertEventsFaults(ctx, tx, cardNumber, importID, card); err != nil {
 		return nil, err
 	} else {
 		counts["events_faults"] = n
@@ -163,25 +166,31 @@ func findImportByHash(ctx context.Context, store *db.DB, hashHex string) (int64,
 	return id, driver.String, true, nil
 }
 
-func upsertDriver(ctx context.Context, tx *sql.Tx, ident *cardIdent, now string) error {
+// hasUsableIdent guards the nested CardIdent pointer chain we'd
+// otherwise have to inline at every call site.
+func hasUsableIdent(ident *ddd.CardIdent) bool {
+	return ident != nil &&
+		ident.CardIdentification != nil &&
+		ident.CardIdentification.CardNumber != ""
+}
+
+func upsertDriver(ctx context.Context, tx *sql.Tx, ident *ddd.CardIdent, now string) error {
 	ci := ident.CardIdentification
-	name := ident.DriverCardHolderIdentification
+	holder := ident.DriverCardHolderIdentification
 	var surname, firstNames, birth string
-	if name != nil {
-		if name.CardHolderName != nil {
-			surname = name.CardHolderName.HolderSurname
-			firstNames = name.CardHolderName.HolderFirstNames
+	if holder != nil {
+		if holder.CardHolderName != nil {
+			surname = holder.CardHolderName.HolderSurname
+			firstNames = holder.CardHolderName.HolderFirstNames
 		}
-		if name.CardHolderBirthDate != nil && name.CardHolderBirthDate.Year > 0 {
+		if holder.CardHolderBirthDate != nil && holder.CardHolderBirthDate.Year > 0 {
 			birth = fmt.Sprintf("%04d-%02d-%02d",
-				name.CardHolderBirthDate.Year,
-				name.CardHolderBirthDate.Month,
-				name.CardHolderBirthDate.Day)
+				holder.CardHolderBirthDate.Year,
+				holder.CardHolderBirthDate.Month,
+				holder.CardHolderBirthDate.Day)
 		}
 	}
 
-	// INSERT OR IGNORE then UPDATE: keep first_seen_at stable but refresh
-	// the rest of the identity columns and bump last_seen_at on every import.
 	_, err := tx.ExecContext(ctx, `
         INSERT INTO drivers (card_number, surname, first_names, birth_date,
                              issuing_state, card_issue_date, card_expiry_date,
@@ -196,7 +205,7 @@ func upsertDriver(ctx context.Context, tx *sql.Tx, ident *cardIdent, now string)
             card_expiry_date = COALESCE(NULLIF(excluded.card_expiry_date, ''), drivers.card_expiry_date),
             last_seen_at = excluded.last_seen_at`,
 		ci.CardNumber, surname, firstNames, birth,
-		ci.CardIssuingMemberState, ci.CardIssueDate, ci.CardExpiryDate,
+		ci.CardIssuingMemberState, formatTime(ci.CardIssueDate), formatTime(ci.CardExpiryDate),
 		now, now,
 	)
 	if err != nil {
@@ -205,8 +214,8 @@ func upsertDriver(ctx context.Context, tx *sql.Tx, ident *cardIdent, now string)
 	return nil
 }
 
-func insertDailyRecords(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, p *cardPayload) (int, error) {
-	records := preferredDailyRecords(p)
+func insertDailyRecords(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, c *ddd.Card) (int, error) {
+	records := preferredDailyRecords(c)
 	if len(records) == 0 {
 		return 0, nil
 	}
@@ -220,10 +229,10 @@ func insertDailyRecords(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 	defer stmt.Close()
 	n := 0
 	for _, r := range records {
-		if r.ActivityRecordDate == "" || strings.HasPrefix(r.ActivityRecordDate, "0001") {
+		if r.ActivityRecordDate.IsZero() {
 			continue
 		}
-		date := r.ActivityRecordDate[:10]
+		date := r.ActivityRecordDate.Format("2006-01-02")
 		body, err := json.Marshal(r.ActivityChangeInfo)
 		if err != nil {
 			return n, fmt.Errorf("marshal activity_change_info for %s: %w", date, err)
@@ -236,26 +245,26 @@ func insertDailyRecords(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 	return n, nil
 }
 
-// preferredDailyRecords mirrors the frontend's "prefer Gen1, fall back to Gen2"
-// rule so the DB doesn't accidentally store the shorter buffer for a card that
-// has both.
-func preferredDailyRecords(p *cardPayload) []decodedDailyRecord {
-	if p.DriverActivity1 != nil && len(p.DriverActivity1.DecodedActivityDailyRecords) > 0 {
-		return p.DriverActivity1.DecodedActivityDailyRecords
+// preferredDailyRecords mirrors the frontend's "prefer Gen1, fall back to
+// Gen2" rule so the DB doesn't accidentally store the shorter buffer for
+// a card that has both.
+func preferredDailyRecords(c *ddd.Card) []ddd.DecodedDailyRecord {
+	if c.DriverActivity1 != nil && len(c.DriverActivity1.DecodedActivityDailyRecords) > 0 {
+		return c.DriverActivity1.DecodedActivityDailyRecords
 	}
-	if p.DriverActivity2 != nil {
-		return p.DriverActivity2.DecodedActivityDailyRecords
+	if c.DriverActivity2 != nil {
+		return c.DriverActivity2.DecodedActivityDailyRecords
 	}
 	return nil
 }
 
-func insertPlaceRecords(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, p *cardPayload) (int, error) {
-	var records []placeRecord
-	if p.PlaceDailyWorkPeriod1 != nil {
-		records = append(records, p.PlaceDailyWorkPeriod1.PlaceRecords...)
+func insertPlaceRecords(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, c *ddd.Card) (int, error) {
+	var records []ddd.PlaceRecord
+	if c.PlaceDailyWorkPeriod1 != nil {
+		records = append(records, c.PlaceDailyWorkPeriod1.PlaceRecords...)
 	}
-	if p.PlaceDailyWorkPeriod2 != nil {
-		records = append(records, p.PlaceDailyWorkPeriod2.PlaceRecords...)
+	if c.PlaceDailyWorkPeriod2 != nil {
+		records = append(records, c.PlaceDailyWorkPeriod2.PlaceRecords...)
 	}
 	if len(records) == 0 {
 		return 0, nil
@@ -270,10 +279,10 @@ func insertPlaceRecords(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 	defer stmt.Close()
 	n := 0
 	for _, r := range records {
-		if r.EntryTime == "" || strings.HasPrefix(r.EntryTime, "0001") {
+		if r.EntryTime.IsZero() {
 			continue
 		}
-		if _, err := stmt.ExecContext(ctx, cardNumber, r.EntryTime, r.EntryTypeDailyWorkPeriod,
+		if _, err := stmt.ExecContext(ctx, cardNumber, r.EntryTime.Format(time.RFC3339), r.EntryTypeDailyWorkPeriod,
 			r.DailyWorkPeriodCountry, r.DailyWorkPeriodRegion, r.VehicleOdometerValue, importID); err != nil {
 			return n, fmt.Errorf("insert place_record %s/%d: %w", r.EntryTime, r.EntryTypeDailyWorkPeriod, err)
 		}
@@ -282,12 +291,12 @@ func insertPlaceRecords(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 	return n, nil
 }
 
-func insertVehicles(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, p *cardPayload, now string) (int, error) {
-	var records []vehicleRecord
-	if p.VehiclesUsed1 != nil && len(p.VehiclesUsed1.CardVehicleRecords) > 0 {
-		records = p.VehiclesUsed1.CardVehicleRecords
-	} else if p.VehiclesUsed2 != nil {
-		records = p.VehiclesUsed2.CardVehicleRecords
+func insertVehicles(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, c *ddd.Card, now string) (int, error) {
+	var records []ddd.VehicleRecord
+	if c.VehiclesUsed1 != nil && len(c.VehiclesUsed1.CardVehicleRecords) > 0 {
+		records = c.VehiclesUsed1.CardVehicleRecords
+	} else if c.VehiclesUsed2 != nil {
+		records = c.VehiclesUsed2.CardVehicleRecords
 	}
 	if len(records) == 0 {
 		return 0, nil
@@ -318,20 +327,21 @@ func insertVehicles(ctx context.Context, tx *sql.Tx, cardNumber string, importID
 		if r.VehicleRegistration == nil || r.VehicleRegistration.VehicleRegistrationNumber == "" {
 			continue
 		}
-		if r.VehicleFirstUse == "" || strings.HasPrefix(r.VehicleFirstUse, "0001") {
+		if r.VehicleFirstUse.IsZero() {
 			continue
 		}
 		reg := r.VehicleRegistration.VehicleRegistrationNumber
 		nation := r.VehicleRegistration.VehicleRegistrationNation
 		lastUse := r.VehicleLastUse
-		if lastUse == "" {
+		if lastUse.IsZero() {
 			lastUse = r.VehicleFirstUse
 		}
 		if _, err := vehicleStmt.ExecContext(ctx, reg, nation, now, now); err != nil {
 			return n, fmt.Errorf("upsert vehicle %s: %w", reg, err)
 		}
 		if _, err := usageStmt.ExecContext(ctx, cardNumber, reg, nation,
-			r.VehicleFirstUse, lastUse, r.VehicleOdometerBegin, r.VehicleOdometerEnd, importID); err != nil {
+			r.VehicleFirstUse.Format(time.RFC3339), lastUse.Format(time.RFC3339),
+			r.VehicleOdometerBegin, r.VehicleOdometerEnd, importID); err != nil {
 			return n, fmt.Errorf("insert driver_vehicles row for %s: %w", reg, err)
 		}
 		n++
@@ -339,13 +349,13 @@ func insertVehicles(ctx context.Context, tx *sql.Tx, cardNumber string, importID
 	return n, nil
 }
 
-func insertGnssPoints(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, p *cardPayload) (int, error) {
-	var records []gnssRecord
-	if p.GnssAccumulated != nil {
-		records = append(records, p.GnssAccumulated.GnssAccumulatedDrivingRecords...)
+func insertGnssPoints(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, c *ddd.Card) (int, error) {
+	var records []ddd.GnssRecord
+	if c.GnssAccumulated != nil {
+		records = append(records, c.GnssAccumulated.GnssAccumulatedDrivingRecords...)
 	}
-	if p.GnssAuthAccumulated != nil {
-		records = append(records, p.GnssAuthAccumulated.GnssAuthAccumulatedDrivingRecords...)
+	if c.GnssAuthAccumulated != nil {
+		records = append(records, c.GnssAuthAccumulated.GnssAuthAccumulatedDrivingRecords...)
 	}
 	if len(records) == 0 {
 		return 0, nil
@@ -362,18 +372,18 @@ func insertGnssPoints(ctx context.Context, tx *sql.Tx, cardNumber string, import
 
 	n := 0
 	for _, r := range records {
-		if r.TimeStamp == "" || strings.HasPrefix(r.TimeStamp, "0001") {
+		if r.TimeStamp.IsZero() {
 			continue
 		}
 		if r.GnssPlaceRecord == nil || r.GnssPlaceRecord.GeoCoordinates == nil {
 			continue
 		}
-		c := r.GnssPlaceRecord.GeoCoordinates
-		// Skip placeholder "no-fix" points.
-		if c.Latitude == 0 && c.Longitude == 0 {
+		coords := r.GnssPlaceRecord.GeoCoordinates
+		if coords.Latitude == 0 && coords.Longitude == 0 {
 			continue
 		}
-		if _, err := stmt.ExecContext(ctx, cardNumber, r.TimeStamp, c.Latitude, c.Longitude, r.VehicleOdometerValue, importID); err != nil {
+		if _, err := stmt.ExecContext(ctx, cardNumber, r.TimeStamp.Format(time.RFC3339),
+			coords.Latitude, coords.Longitude, r.VehicleOdometerValue, importID); err != nil {
 			return n, fmt.Errorf("insert gnss_point %s: %w", r.TimeStamp, err)
 		}
 		n++
@@ -381,7 +391,7 @@ func insertGnssPoints(ctx context.Context, tx *sql.Tx, cardNumber string, import
 	return n, nil
 }
 
-func insertEventsFaults(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, p *cardPayload) (int, error) {
+func insertEventsFaults(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, c *ddd.Card) (int, error) {
 	stmt, err := tx.PrepareContext(ctx, `
         INSERT OR REPLACE INTO events_faults
             (driver_card_number, kind, event_type, begin_time, end_time, vehicle_registration, source_import_id)
@@ -392,14 +402,13 @@ func insertEventsFaults(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 	defer stmt.Close()
 
 	n := 0
-	// Events: card_event_data_{1,2}.card_event_records_array[*].card_event_records[*]
-	for _, src := range []*eventOrFaultData{p.EventData1, p.EventData2} {
+	for _, src := range []*ddd.EventOrFaultData{c.EventData1, c.EventData2} {
 		if src == nil {
 			continue
 		}
 		for _, bucket := range src.CardEventRecordsArray {
 			for _, e := range bucket.CardEventRecords {
-				if e.EventBeginTime == "" || strings.HasPrefix(e.EventBeginTime, "0001") {
+				if e.EventBeginTime.IsZero() {
 					continue
 				}
 				reg := ""
@@ -407,21 +416,20 @@ func insertEventsFaults(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 					reg = e.EventVehicleRegistration.VehicleRegistrationNumber
 				}
 				if _, err := stmt.ExecContext(ctx, cardNumber, "event", e.EventType,
-					e.EventBeginTime, nullable(e.EventEndTime), nullable(reg), importID); err != nil {
+					e.EventBeginTime.Format(time.RFC3339), nullableTime(e.EventEndTime), nullableString(reg), importID); err != nil {
 					return n, fmt.Errorf("insert event %d@%s: %w", e.EventType, e.EventBeginTime, err)
 				}
 				n++
 			}
 		}
 	}
-	// Faults: card_fault_data_{1,2}.card_fault_records_array[*].card_fault_records[*]
-	for _, src := range []*eventOrFaultData{p.FaultData1, p.FaultData2} {
+	for _, src := range []*ddd.EventOrFaultData{c.FaultData1, c.FaultData2} {
 		if src == nil {
 			continue
 		}
 		for _, bucket := range src.CardFaultRecordsArray {
 			for _, f := range bucket.CardFaultRecords {
-				if f.FaultBeginTime == "" || strings.HasPrefix(f.FaultBeginTime, "0001") {
+				if f.FaultBeginTime.IsZero() {
 					continue
 				}
 				reg := ""
@@ -429,7 +437,7 @@ func insertEventsFaults(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 					reg = f.FaultVehicleRegistration.VehicleRegistrationNumber
 				}
 				if _, err := stmt.ExecContext(ctx, cardNumber, "fault", f.FaultType,
-					f.FaultBeginTime, nullable(f.FaultEndTime), nullable(reg), importID); err != nil {
+					f.FaultBeginTime.Format(time.RFC3339), nullableTime(f.FaultEndTime), nullableString(reg), importID); err != nil {
 					return n, fmt.Errorf("insert fault %d@%s: %w", f.FaultType, f.FaultBeginTime, err)
 				}
 				n++
@@ -439,8 +447,22 @@ func insertEventsFaults(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 	return n, nil
 }
 
-func nullable(s string) any {
-	if s == "" || strings.HasPrefix(s, "0001") {
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.RFC3339)
+}
+
+func nullableTime(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return t.Format(time.RFC3339)
+}
+
+func nullableString(s string) any {
+	if s == "" {
 		return nil
 	}
 	return s

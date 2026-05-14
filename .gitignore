@@ -14,6 +14,13 @@ output.err
 # kept here for source inspection only). Not part of this repo.
 /tachoparser/
 
+# Legislation references: keep the grep-friendly .txt mirrors in-repo so
+# the migration-plan citations resolve offline. The raw HTML downloads
+# and browser-saved asset bundles are heavyweight (~55 MB combined) —
+# keep them locally for fidelity, but don't ship them.
+/docs/legislation/*.html
+/docs/legislation/*_files/
+
 # Editor / OS noise
 *.swp
 *.swo
