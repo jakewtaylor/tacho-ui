@@ -31,6 +31,15 @@ type Card struct {
 	GnssAccumulated     *GnssData `json:"gnss_accumulated_driving,omitempty"`
 	GnssAuthAccumulated *GnssData `json:"gnss_auth_accumulated_driving,omitempty"`
 
+	// Gen2v2-only sections. Populated when the driver card was issued
+	// against cardStructureVersion {01 01} (Reg. 2021/1228) and the
+	// corresponding EF is non-empty.
+	BorderCrossings    *BorderCrossingsData `json:"card_border_crossings,omitempty"`
+	LoadUnloadOps      *LoadUnloadData      `json:"card_load_unload_operations,omitempty"`
+	LoadTypeEntries    *LoadTypeData        `json:"card_load_type_entries,omitempty"`
+	PlacesAuthStatus   []AuthStatusEntry    `json:"places_authentication,omitempty"`
+	GnssPlacesAuthStatus []AuthStatusEntry  `json:"gnss_places_authentication,omitempty"`
+
 	// Signature verification status — populated by Phase B. Until then
 	// these always read false.
 	Verified  bool              `json:"verified"`
@@ -206,10 +215,63 @@ type GnssPlaceRecord struct {
 	GeoCoordinates *GeoCoordinates `json:"geo_coordinates,omitempty"`
 }
 
-// GeoCoordinates — Appendix 1 §2.77 (GeoCoordinates SIZE(8)). Latitude
-// and longitude are stored as signed milli-arcseconds on the wire; the
-// decoder converts them to fractional decimal degrees for downstream use.
+// GeoCoordinates — Appendix 1 §2.76. Latitude/longitude as decimal
+// degrees, decoded from the on-wire 3-byte signed DDMM.M ×10 form.
 type GeoCoordinates struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
+}
+
+// --- Gen2v2 EFs (Reg. 2021/1228) ---
+
+// BorderCrossingsData — EF_Border_Crossings (2021/1228 §2.11a).
+type BorderCrossingsData struct {
+	CardBorderCrossingRecords []BorderCrossingRecord `json:"card_border_crossing_records,omitempty"`
+}
+
+// BorderCrossingRecord — 2021/1228 §2.11b CardBorderCrossingRecord.
+// Logs a vehicle-detected change of country with the GNSS position at
+// detection time and the odometer value.
+type BorderCrossingRecord struct {
+	CountryLeft          int           `json:"country_left"`    // NationNumeric; 0xFF = "Rest of the World"
+	CountryEntered       int           `json:"country_entered"`
+	TimeStamp            time.Time     `json:"time_stamp"`
+	GeoCoordinates       *GeoCoordinates `json:"geo_coordinates,omitempty"`
+	AuthenticationStatus string        `json:"authentication_status"`
+	VehicleOdometerValue int           `json:"vehicle_odometer_value"`
+}
+
+// LoadUnloadData — EF_Load_Unload_Operations (2021/1228 §2.24c).
+type LoadUnloadData struct {
+	CardLoadUnloadRecords []LoadUnloadRecord `json:"card_load_unload_records,omitempty"`
+}
+
+// LoadUnloadRecord — 2021/1228 §2.24d CardLoadUnloadRecord.
+// Logs a cargo load or unload event with location and odometer.
+type LoadUnloadRecord struct {
+	TimeStamp            time.Time       `json:"time_stamp"`
+	OperationType        string          `json:"operation_type"` // load / unload / simultaneous / unknown
+	GeoCoordinates       *GeoCoordinates `json:"geo_coordinates,omitempty"`
+	AuthenticationStatus string          `json:"authentication_status"`
+	VehicleOdometerValue int             `json:"vehicle_odometer_value"`
+}
+
+// LoadTypeData — EF_Load_Type_Entries (2021/1228 §2.24a).
+type LoadTypeData struct {
+	CardLoadTypeEntryRecords []LoadTypeEntry `json:"card_load_type_entry_records,omitempty"`
+}
+
+// LoadTypeEntry — 2021/1228 §2.24b CardLoadTypeEntryRecord.
+type LoadTypeEntry struct {
+	TimeStamp time.Time `json:"time_stamp"`
+	LoadType  string    `json:"load_type"` // undefined / goods / passengers / unknown
+}
+
+// AuthStatusEntry — joined-by-timestamp side record from
+// EF_Places_Authentication (2021/1228 §2.116b) or
+// EF_GNSS_Places_Authentication (§2.79b). Match against a PlaceRecord's
+// EntryTime or a GnssRecord's TimeStamp respectively.
+type AuthStatusEntry struct {
+	TimeStamp            time.Time `json:"time_stamp"`
+	AuthenticationStatus string    `json:"authentication_status"`
 }

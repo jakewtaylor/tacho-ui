@@ -1,7 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import { CheckCircle2, Info, ShieldAlert, TriangleAlert } from "lucide-react";
 
-import { Alert, AlertDescription, AlertTitle } from "@tacholens/ui/components/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@tacholens/ui/components/alert";
 import { Badge } from "@tacholens/ui/components/badge";
 import { Card, CardContent } from "@tacholens/ui/components/card";
 import { cn } from "@tacholens/ui/lib/utils";
@@ -98,45 +102,44 @@ export function InfringementsPanel({
           )}
         </div>
       </div>
-      <Card size="sm">
-        <CardContent className="flex flex-col gap-2">
-          {items.map((it, i) => {
-            const s = SEVERITY[it.severity];
-            const Icon = s.Icon;
-            return (
-              <Alert
-                key={`${it.code}-${it.date ?? ""}-${i}`}
-                className={cn("text-sm", s.container)}
-              >
-                <Icon />
-                <AlertTitle className="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span>{it.title}</span>
-                  {it.date && cardNumber && linkDates ? (
-                    <Link
-                      to={`/driver/${cardNumber}/day/${it.date}`}
-                      className="font-mono text-[0.7rem] text-muted-foreground hover:text-foreground"
-                    >
-                      {it.date} →
-                    </Link>
-                  ) : it.date ? (
-                    <span className="font-mono text-[0.7rem] text-muted-foreground">
-                      {it.date}
-                    </span>
-                  ) : null}
-                </AlertTitle>
-                <AlertDescription>
-                  <p>{it.description}</p>
-                  {it.ruleRef && (
-                    <p className="mt-1 text-[0.65rem] uppercase tracking-wider text-muted-foreground">
-                      {it.ruleRef}
-                    </p>
-                  )}
-                </AlertDescription>
-              </Alert>
-            );
-          })}
-        </CardContent>
-      </Card>
+
+      <div className="flex flex-col gap-2">
+        {items.map((it, i) => {
+          const s = SEVERITY[it.severity];
+          const Icon = s.Icon;
+          return (
+            <Alert
+              key={`${it.code}-${it.date ?? ""}-${i}`}
+              className={cn("text-sm", s.container)}
+            >
+              <Icon />
+              <AlertTitle className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span>{it.title}</span>
+                {it.date && cardNumber && linkDates ? (
+                  <Link
+                    to={`/driver/${cardNumber}/day/${it.date}`}
+                    className="font-mono text-[0.7rem] text-muted-foreground hover:text-foreground"
+                  >
+                    {it.date} →
+                  </Link>
+                ) : it.date ? (
+                  <span className="font-mono text-[0.7rem] text-muted-foreground">
+                    {it.date}
+                  </span>
+                ) : null}
+              </AlertTitle>
+              <AlertDescription>
+                <p>{it.description}</p>
+                {it.ruleRef && (
+                  <p className="mt-1 text-[0.65rem] uppercase tracking-wider text-muted-foreground">
+                    {it.ruleRef}
+                  </p>
+                )}
+              </AlertDescription>
+            </Alert>
+          );
+        })}
+      </div>
     </section>
   );
 }

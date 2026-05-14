@@ -164,7 +164,7 @@ func (d *DB) GetDailyRecords(ctx context.Context, cardNumber string) ([]DailyRec
 // but ascending is the natural order for derivation).
 func (d *DB) GetPlaceRecords(ctx context.Context, cardNumber string) ([]PlaceRecord, error) {
 	const q = `
-        SELECT entry_time, entry_type, country, region, odometer
+        SELECT entry_time, entry_type, country, region, odometer, authentication_status
         FROM place_records
         WHERE driver_card_number = ?
         ORDER BY entry_time ASC`
@@ -176,8 +176,12 @@ func (d *DB) GetPlaceRecords(ctx context.Context, cardNumber string) ([]PlaceRec
 	var out []PlaceRecord
 	for rows.Next() {
 		var p PlaceRecord
-		if err := rows.Scan(&p.EntryTime, &p.EntryTypeDailyWorkPeriod, &p.DailyWorkPeriodCountry, &p.DailyWorkPeriodRegion, &p.VehicleOdometerValue); err != nil {
+		var auth string
+		if err := rows.Scan(&p.EntryTime, &p.EntryTypeDailyWorkPeriod, &p.DailyWorkPeriodCountry, &p.DailyWorkPeriodRegion, &p.VehicleOdometerValue, &auth); err != nil {
 			return nil, fmt.Errorf("scan place record: %w", err)
+		}
+		if auth != "unknown" {
+			p.AuthenticationStatus = auth
 		}
 		out = append(out, p)
 	}
@@ -187,7 +191,7 @@ func (d *DB) GetPlaceRecords(ctx context.Context, cardNumber string) ([]PlaceRec
 // GetGnssPoints returns GNSS samples for one driver, chronological ascending.
 func (d *DB) GetGnssPoints(ctx context.Context, cardNumber string) ([]GnssPoint, error) {
 	const q = `
-        SELECT timestamp, latitude, longitude, odometer
+        SELECT timestamp, latitude, longitude, odometer, authentication_status
         FROM gnss_points
         WHERE driver_card_number = ?
         ORDER BY timestamp ASC`
@@ -199,10 +203,92 @@ func (d *DB) GetGnssPoints(ctx context.Context, cardNumber string) ([]GnssPoint,
 	var out []GnssPoint
 	for rows.Next() {
 		var g GnssPoint
-		if err := rows.Scan(&g.Timestamp, &g.Latitude, &g.Longitude, &g.Odometer); err != nil {
+		var auth string
+		if err := rows.Scan(&g.Timestamp, &g.Latitude, &g.Longitude, &g.Odometer, &auth); err != nil {
 			return nil, fmt.Errorf("scan gnss point: %w", err)
 		}
+		if auth != "unknown" {
+			g.AuthenticationStatus = auth
+		}
 		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+// GetBorderCrossings returns border-crossing events for one driver,
+// chronological ascending.
+func (d *DB) GetBorderCrossings(ctx context.Context, cardNumber string) ([]BorderCrossing, error) {
+	const q = `
+        SELECT crossed_at, country_left, country_entered,
+               COALESCE(latitude, 0), COALESCE(longitude, 0),
+               authentication_status, odometer
+        FROM border_crossings
+        WHERE driver_card_number = ?
+        ORDER BY crossed_at ASC`
+	rows, err := d.conn.QueryContext(ctx, q, cardNumber)
+	if err != nil {
+		return nil, fmt.Errorf("get border crossings: %w", err)
+	}
+	defer rows.Close()
+	var out []BorderCrossing
+	for rows.Next() {
+		var b BorderCrossing
+		if err := rows.Scan(&b.CrossedAt, &b.CountryLeft, &b.CountryEntered,
+			&b.Latitude, &b.Longitude, &b.AuthenticationStatus, &b.Odometer); err != nil {
+			return nil, fmt.Errorf("scan border crossing: %w", err)
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+// GetLoadUnloadOps returns cargo load/unload events for one driver,
+// chronological ascending.
+func (d *DB) GetLoadUnloadOps(ctx context.Context, cardNumber string) ([]LoadUnloadOp, error) {
+	const q = `
+        SELECT operation_at, operation_type,
+               COALESCE(latitude, 0), COALESCE(longitude, 0),
+               authentication_status, odometer
+        FROM load_unload_ops
+        WHERE driver_card_number = ?
+        ORDER BY operation_at ASC`
+	rows, err := d.conn.QueryContext(ctx, q, cardNumber)
+	if err != nil {
+		return nil, fmt.Errorf("get load/unload ops: %w", err)
+	}
+	defer rows.Close()
+	var out []LoadUnloadOp
+	for rows.Next() {
+		var o LoadUnloadOp
+		if err := rows.Scan(&o.OperationAt, &o.OperationType,
+			&o.Latitude, &o.Longitude, &o.AuthenticationStatus, &o.Odometer); err != nil {
+			return nil, fmt.Errorf("scan load/unload op: %w", err)
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+// GetLoadTypeEntries returns cargo-type change events for one driver,
+// chronological ascending.
+func (d *DB) GetLoadTypeEntries(ctx context.Context, cardNumber string) ([]LoadTypeEntry, error) {
+	const q = `
+        SELECT entered_at, load_type
+        FROM load_type_entries
+        WHERE driver_card_number = ?
+        ORDER BY entered_at ASC`
+	rows, err := d.conn.QueryContext(ctx, q, cardNumber)
+	if err != nil {
+		return nil, fmt.Errorf("get load type entries: %w", err)
+	}
+	defer rows.Close()
+	var out []LoadTypeEntry
+	for rows.Next() {
+		var e LoadTypeEntry
+		if err := rows.Scan(&e.EnteredAt, &e.LoadType); err != nil {
+			return nil, fmt.Errorf("scan load type entry: %w", err)
+		}
+		out = append(out, e)
 	}
 	return out, rows.Err()
 }

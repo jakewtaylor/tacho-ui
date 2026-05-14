@@ -50,6 +50,29 @@ func TestImportSampleCard(t *testing.T) {
 	if result.Counts["place_records"] == 0 {
 		t.Fatalf("place_records was zero — shift derivation will break")
 	}
+	// Gen2v2-only EFs: sample card is Gen2v2 so all three should populate.
+	if result.Counts["border_crossings"] == 0 {
+		t.Fatalf("border_crossings was zero — Gen2v2 import path broken")
+	}
+	if result.Counts["load_type_entries"] == 0 {
+		t.Fatalf("load_type_entries was zero — Gen2v2 import path broken")
+	}
+	// load_unload_ops is allowed to be zero on this card — the driver
+	// never pressed the load/unload keys. Just verify the column exists
+	// by running the read query.
+	if _, err := store.GetLoadUnloadOps(ctx, result.DriverCardNumber); err != nil {
+		t.Fatalf("GetLoadUnloadOps: %v", err)
+	}
+	borders, err := store.GetBorderCrossings(ctx, result.DriverCardNumber)
+	if err != nil {
+		t.Fatalf("GetBorderCrossings: %v", err)
+	}
+	if len(borders) == 0 {
+		t.Fatalf("GetBorderCrossings returned no rows")
+	}
+	if borders[0].CountryLeft == 0 && borders[0].CountryEntered == 0 {
+		t.Fatalf("first border crossing has no country codes")
+	}
 
 	// Driver profile.
 	profile, err := store.GetDriverProfile(ctx, result.DriverCardNumber)

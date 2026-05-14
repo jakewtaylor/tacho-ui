@@ -205,6 +205,7 @@ export function AppLayout() {
           drivers={drivers}
           triggerImport={open}
           importing={importing}
+          className="z-20"
         />
         <SidebarInset>
           <Topbar drivers={drivers} loading={isLoading} />

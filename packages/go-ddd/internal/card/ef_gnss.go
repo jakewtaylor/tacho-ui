@@ -3,6 +3,7 @@ package card
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jakewtaylor/go-ddd/internal/primitives"
@@ -98,8 +99,8 @@ func decodeOneGnss(slot []byte) (GnssRecord, bool, error) {
 
 	return GnssRecord{
 		TimeStamp: outerTS,
-		Latitude:  geoCoordinateToDegrees(latRaw),
-		Longitude: geoCoordinateToDegrees(lngRaw),
+		Latitude:  geoCoordinateToDegrees(latRaw, false),
+		Longitude: geoCoordinateToDegrees(lngRaw, true),
 		Odometer:  int(odo),
 	}, true, nil
 }
@@ -119,10 +120,25 @@ func decodeOneGnss(slot []byte) (GnssRecord, bool, error) {
 // Worked example: lat 0x00C8F5 = 51445 → 51° 44.5′ N → 51.7417° decimal,
 // which matches the sample card's first GNSS fix (UK).
 //
-// Sentinel: the spec uses ±90001 / ±180001 to indicate "no fix" — those
-// decode to nonsense degrees and callers can filter on the outer
-// TimeStamp.IsZero() check upstream.
-func geoCoordinateToDegrees(raw int32) float64 {
+// Sentinel: returns NaN when the raw value is outside the spec's valid
+// range — latitude `INTEGER(-90000..90001)` (App. 1 §2.76), longitude
+// `INTEGER(-180000..180001)`. The 90001 / 180001 "+1" values are
+// reserved by the spec for "no information available". Some VUs also
+// emit 0x7FFFFF (or other unconstrained 24-bit values) when no GPS fix
+// is available, which the spec doesn't formally cover but is the
+// pragmatic signal we treat as "no fix" here. The caller is expected
+// to filter NaN coordinates out of any downstream rendering.
+//
+// `isLng` selects which range to enforce. Latitude uses ±90001;
+// longitude uses ±180001.
+func geoCoordinateToDegrees(raw int32, isLng bool) float64 {
+	maxRaw := int32(90001)
+	if isLng {
+		maxRaw = 180001
+	}
+	if raw > maxRaw || raw < -maxRaw {
+		return math.NaN()
+	}
 	if raw == 0 {
 		return 0
 	}

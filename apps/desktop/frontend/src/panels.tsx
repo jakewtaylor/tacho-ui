@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { TriangleAlert } from "lucide-react";
 
@@ -12,6 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@tacholens/ui/components/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@tacholens/ui/components/tooltip";
 import {
   Table,
   TableBody,
@@ -38,7 +43,19 @@ import { nationAlpha, nationName } from "./nations";
 import { vehicleForShift, type VehicleUsage } from "./vehicles";
 import { durationMinutes, type CardEvent } from "./events";
 import { eventCategory, eventTypeLabel } from "./eventTypes";
+import {
+  deriveBorderTrips,
+  groupIntoJourneys,
+  isNoInfoEvent,
+  isPhantomDropout,
+  type BorderTrip,
+  type Journey,
+} from "./borderCrossings";
+import { JourneyMap } from "./JourneyMap";
+import { ChevronRight } from "lucide-react";
 import type { db } from "../wailsjs/go/models";
+
+const ROW_LIMIT = 50;
 
 export type Summary = {
   label: string;
@@ -444,6 +461,441 @@ function categoryBadgeVariant(
     default:
       return "secondary";
   }
+}
+
+function formatTimestamp(s: string): string {
+  return s.replace("T", " ").replace("Z", "");
+}
+
+function authBadge(status: string | undefined): ReactNode {
+  if (!status || status === "unknown") return null;
+  const ok = status === "authenticated";
+  return (
+    <Badge
+      variant={ok ? "secondary" : "outline"}
+      className={ok ? "font-mono text-[10px]" : "font-mono text-[10px] text-amber-500"}
+      title={ok ? "GNSS position authenticated by the VU" : "GNSS position NOT authenticated"}
+    >
+      {ok ? "✓ auth" : "⚠ unauth"}
+    </Badge>
+  );
+}
+
+function operationBadge(op: string): ReactNode {
+  const variants: Record<string, "secondary" | "outline" | "destructive"> = {
+    load: "secondary",
+    unload: "outline",
+    simultaneous: "destructive",
+    unknown: "outline",
+  };
+  return <Badge variant={variants[op] ?? "outline"}>{op}</Badge>;
+}
+
+function loadTypeBadge(t: string): ReactNode {
+  return (
+    <Badge variant="outline" className="font-mono text-xs">
+      {t}
+    </Badge>
+  );
+}
+
+function tripWhen(t: BorderTrip): string {
+  return t.kind === "offmap" ? t.leftAt : t.at;
+}
+
+function durationMins(fromIso: string, toIso: string): number {
+  const ms = Date.parse(toIso) - Date.parse(fromIso);
+  return Math.max(0, Math.round(ms / 60000));
+}
+
+function formatDuration(mins: number): string {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function locationCell(lat: number, lng: number, auth?: string): ReactNode {
+  return (
+    <>
+      <span className="font-mono text-xs">
+        {lat || lng ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : "—"}
+      </span>
+      <span className="ml-2">{authBadge(auth)}</span>
+    </>
+  );
+}
+
+function countryCell(code: number): ReactNode {
+  return (
+    <>
+      <Badge variant="outline" className="font-mono">
+        {nationAlpha(code)}
+      </Badge>
+      <span className="ml-2 text-xs text-muted-foreground">
+        {nationName(code)}
+      </span>
+    </>
+  );
+}
+
+function CountryArrowChain({
+  from,
+  via,
+  to,
+  hasOffmap,
+}: {
+  from: number;
+  via: number[];
+  to: number;
+  hasOffmap: boolean;
+}) {
+  const codes = [from, ...via, to];
+  return (
+    <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+      {codes.map((c, i) => (
+        <span key={`${c}-${i}`} className="flex items-center gap-1">
+          {i > 0 && (
+            <ChevronRight className="size-3 text-muted-foreground" />
+          )}
+          <Badge
+            variant={i === 0 || i === codes.length - 1 ? "secondary" : "outline"}
+            className="font-mono"
+            title={nationName(c)}
+          >
+            {nationAlpha(c)}
+          </Badge>
+        </span>
+      ))}
+      {hasOffmap && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="ml-2 inline-flex">
+              <Badge
+                variant="outline"
+                className="cursor-help font-mono text-[10px] text-muted-foreground"
+              >
+                via off-map (ferry?)
+              </Badge>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            At some point in this journey the vehicle was off the VU's
+            onboard digital map — usually a ferry crossing, occasionally a
+            stretch of unmapped road. Expand the journey to see when and
+            where.
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
+function JourneyRow({
+  journey,
+  isExpanded,
+  onToggle,
+  gnssPoints,
+}: {
+  journey: Journey;
+  isExpanded: boolean;
+  onToggle: () => void;
+  gnssPoints: db.GnssPoint[];
+}) {
+  const dur = formatDuration(journey.durationMinutes);
+  return (
+    <>
+      <TableRow className="cursor-pointer hover:bg-muted/40" onClick={onToggle}>
+        <TableCell className="pl-4 font-mono text-xs">
+          <div>{formatTimestamp(journey.startAt)}</div>
+          <div className="text-[10px] text-muted-foreground">
+            {dur} · {journey.legCount} leg{journey.legCount === 1 ? "" : "s"}
+          </div>
+        </TableCell>
+        <TableCell colSpan={3}>
+          <CountryArrowChain
+            from={journey.from}
+            via={journey.via}
+            to={journey.to}
+            hasOffmap={journey.hasOffmap}
+          />
+        </TableCell>
+        <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
+          {journey.totalKm > 0 ? `${journey.totalKm.toLocaleString()} km` : "—"}
+          <div className="text-[10px] text-muted-foreground">
+            <ChevronRight
+              className={
+                "inline size-3 transition-transform " +
+                (isExpanded ? "rotate-90" : "")
+              }
+            />
+            {isExpanded ? "hide legs" : "show legs"}
+          </div>
+        </TableCell>
+      </TableRow>
+      {isExpanded && (
+        <>
+          <TableRow>
+            <TableCell colSpan={5} className="p-0">
+              <JourneyMap journey={journey} gnssPoints={gnssPoints} />
+            </TableCell>
+          </TableRow>
+          {journey.legs.map((leg, i) => (
+            <JourneyLegRow key={`leg-${journey.startAt}-${i}`} leg={leg} />
+          ))}
+        </>
+      )}
+    </>
+  );
+}
+
+function JourneyLegRow({ leg }: { leg: BorderTrip }) {
+  if (leg.kind === "crossing") {
+    return (
+      <TableRow className="bg-muted/20 text-xs">
+        <TableCell className="pl-10 font-mono text-muted-foreground">
+          {formatTimestamp(leg.at)}
+        </TableCell>
+        <TableCell>{countryCell(leg.from)}</TableCell>
+        <TableCell>{countryCell(leg.to)}</TableCell>
+        <TableCell>
+          {locationCell(leg.latitude, leg.longitude, leg.authenticationStatus)}
+        </TableCell>
+        <TableCell className="pr-4 text-right font-mono tabular-nums">
+          {leg.odometer.toLocaleString()} km
+        </TableCell>
+      </TableRow>
+    );
+  }
+  if (leg.kind === "offmap") {
+    const dur = durationMins(leg.leftAt, leg.rejoinedAt);
+    return (
+      <TableRow className="bg-muted/20 text-xs">
+        <TableCell className="pl-10 font-mono text-muted-foreground">
+          {formatTimestamp(leg.leftAt)}
+          <div className="text-[10px]">
+            off-map for {formatDuration(dur)}
+          </div>
+        </TableCell>
+        <TableCell>{countryCell(leg.from)}</TableCell>
+        <TableCell>{countryCell(leg.to)}</TableCell>
+        <TableCell>
+          {locationCell(
+            leg.fromLatitude,
+            leg.fromLongitude,
+            leg.authenticationStatus,
+          )}
+        </TableCell>
+        <TableCell className="pr-4 text-right font-mono tabular-nums">
+          {leg.odometer.toLocaleString()} km
+          {leg.kmTravelled > 1 && (
+            <div className="text-[10px]">
+              +{leg.kmTravelled.toLocaleString()} km off-map
+            </div>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  }
+  // orphan
+  return (
+    <TableRow className="bg-muted/20 text-xs">
+      <TableCell className="pl-10 font-mono text-muted-foreground">
+        {formatTimestamp(leg.at)}
+      </TableCell>
+      <TableCell>{countryCell(leg.from)}</TableCell>
+      <TableCell>{countryCell(leg.to)}</TableCell>
+      <TableCell>
+        {locationCell(leg.latitude, leg.longitude, leg.authenticationStatus)}
+      </TableCell>
+      <TableCell className="pr-4 text-right font-mono tabular-nums">
+        {leg.odometer.toLocaleString()} km
+      </TableCell>
+    </TableRow>
+  );
+}
+
+export function BorderCrossingsPanel({
+  crossings,
+  gnssPoints,
+}: {
+  crossings: db.BorderCrossing[];
+  gnssPoints: db.GnssPoint[];
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const trips = useMemo(() => deriveBorderTrips(crossings), [crossings]);
+  const dropoutCount = useMemo(
+    () => trips.filter(isPhantomDropout).length,
+    [trips],
+  );
+  const noInfoCount = useMemo(
+    () =>
+      trips.filter((t) => !isPhantomDropout(t) && isNoInfoEvent(t)).length,
+    [trips],
+  );
+  const journeys = useMemo(() => groupIntoJourneys(trips), [trips]);
+  const visibleJourneys = useMemo(() => {
+    // Newest first, then cap. 25 journeys ≈ 100+ crossings if all expanded.
+    return journeys
+      .slice()
+      .sort((a, b) => b.startAt.localeCompare(a.startAt))
+      .slice(0, 25);
+  }, [journeys]);
+
+  if (journeys.length === 0) return null;
+
+  const toggle = (key: string) =>
+    setExpanded((m) => ({ ...m, [key]: !m[key] }));
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>Border crossings</CardTitle>
+        <CardDescription>
+          {journeys.length} journey{journeys.length === 1 ? "" : "s"} grouped
+          from {trips.length - dropoutCount} crossing
+          {trips.length - dropoutCount === 1 ? "" : "s"} (Gen2v2 only). A new
+          journey starts after a 6+ hour gap. Click a row to expand its legs.
+          {dropoutCount > 0 && (
+            <>
+              {" "}
+              <span className="text-muted-foreground">
+                {dropoutCount} phantom GPS dropout
+                {dropoutCount === 1 ? " was" : "s were"} filtered out — the
+                vehicle never crossed a border.
+              </span>
+            </>
+          )}
+          {noInfoCount > 0 && (
+            <>
+              {" "}
+              <span className="text-muted-foreground">
+                {noInfoCount} "no-information" event
+                {noInfoCount === 1 ? " was" : "s were"} filtered out — the VU
+                emits these on card insertion before GPS locks on, not real
+                crossings.
+              </span>
+            </>
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-4">When</TableHead>
+              <TableHead colSpan={3}>Route</TableHead>
+              <TableHead className="pr-4 text-right">Distance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visibleJourneys.map((j, i) => {
+              const key = `${j.startAt}-${i}`;
+              return (
+                <JourneyRow
+                  key={key}
+                  journey={j}
+                  isExpanded={!!expanded[key]}
+                  onToggle={() => toggle(key)}
+                  gnssPoints={gnssPoints}
+                />
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+      {journeys.length > 25 && (
+        <CardFooter className="text-xs text-muted-foreground">
+          Showing newest 25 of {journeys.length} journeys.
+        </CardFooter>
+      )}
+    </Card>
+  );
+}
+
+export function CargoPanel({
+  loadUnloadOps,
+  loadTypeEntries,
+}: {
+  loadUnloadOps: db.LoadUnloadOp[];
+  loadTypeEntries: db.LoadTypeEntry[];
+}) {
+  const ops = useMemo(
+    () => loadUnloadOps.slice(-ROW_LIMIT).reverse(),
+    [loadUnloadOps],
+  );
+  const types = useMemo(
+    () => loadTypeEntries.slice(-ROW_LIMIT).reverse(),
+    [loadTypeEntries],
+  );
+  if (ops.length === 0 && types.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>Cargo events</CardTitle>
+        <CardDescription>
+          Load/unload presses and load-type entries from the vehicle unit
+          (Gen2v2 only). {ops.length} operations, {types.length} type changes
+          on this card.
+        </CardDescription>
+      </CardHeader>
+      {ops.length > 0 && (
+        <CardContent className="px-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4">When</TableHead>
+                <TableHead>Operation</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead className="pr-4 text-right">Odometer</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ops.map((r, i) => (
+                <TableRow key={`op-${r.operationAt}-${i}`}>
+                  <TableCell className="pl-4 font-mono text-xs">
+                    {formatTimestamp(r.operationAt)}
+                  </TableCell>
+                  <TableCell>{operationBadge(r.operationType)}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {r.latitude || r.longitude
+                      ? `${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}`
+                      : "—"}
+                    <span className="ml-2">
+                      {authBadge(r.authenticationStatus)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
+                    {r.odometer.toLocaleString()} km
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      )}
+      {types.length > 0 && (
+        <CardContent className="px-0">
+          <div className="border-t px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground">
+            Load type changes
+          </div>
+          <Table>
+            <TableBody>
+              {types.map((r, i) => (
+                <TableRow key={`type-${r.enteredAt}-${i}`}>
+                  <TableCell className="pl-4 font-mono text-xs">
+                    {formatTimestamp(r.enteredAt)}
+                  </TableCell>
+                  <TableCell className="pr-4">{loadTypeBadge(r.loadType)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      )}
+    </Card>
+  );
 }
 
 export function EventsPanel({ events }: { events: CardEvent[] }) {

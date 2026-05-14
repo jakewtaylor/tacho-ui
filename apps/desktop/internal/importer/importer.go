@@ -124,6 +124,24 @@ func ImportCard(ctx context.Context, store *db.DB, filename string, data []byte)
 	} else {
 		counts["events_faults"] = n
 	}
+	if n, err := insertBorderCrossings(ctx, tx, cardNumber, importID, card); err != nil {
+		return nil, err
+	} else {
+		counts["border_crossings"] = n
+	}
+	if n, err := insertLoadUnload(ctx, tx, cardNumber, importID, card); err != nil {
+		return nil, err
+	} else {
+		counts["load_unload_ops"] = n
+	}
+	if n, err := insertLoadTypes(ctx, tx, cardNumber, importID, card); err != nil {
+		return nil, err
+	} else {
+		counts["load_type_entries"] = n
+	}
+	if err := backfillAuthStatus(ctx, tx, cardNumber, card); err != nil {
+		return nil, err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit: %w", err)
@@ -445,6 +463,142 @@ func insertEventsFaults(ctx context.Context, tx *sql.Tx, cardNumber string, impo
 		}
 	}
 	return n, nil
+}
+
+func insertBorderCrossings(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, c *ddd.Card) (int, error) {
+	if c.BorderCrossings == nil || len(c.BorderCrossings.CardBorderCrossingRecords) == 0 {
+		return 0, nil
+	}
+	stmt, err := tx.PrepareContext(ctx, `
+        INSERT OR REPLACE INTO border_crossings
+            (driver_card_number, crossed_at, country_left, country_entered,
+             latitude, longitude, authentication_status, odometer, source_import_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return 0, fmt.Errorf("prepare border_crossings insert: %w", err)
+	}
+	defer stmt.Close()
+	n := 0
+	for _, r := range c.BorderCrossings.CardBorderCrossingRecords {
+		if r.TimeStamp.IsZero() {
+			continue
+		}
+		var lat, lng any
+		if r.GeoCoordinates != nil {
+			lat = r.GeoCoordinates.Latitude
+			lng = r.GeoCoordinates.Longitude
+		}
+		if _, err := stmt.ExecContext(ctx, cardNumber, r.TimeStamp.Format(time.RFC3339),
+			r.CountryLeft, r.CountryEntered, lat, lng, r.AuthenticationStatus, r.VehicleOdometerValue, importID); err != nil {
+			return n, fmt.Errorf("insert border_crossing %s: %w", r.TimeStamp, err)
+		}
+		n++
+	}
+	return n, nil
+}
+
+func insertLoadUnload(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, c *ddd.Card) (int, error) {
+	if c.LoadUnloadOps == nil || len(c.LoadUnloadOps.CardLoadUnloadRecords) == 0 {
+		return 0, nil
+	}
+	stmt, err := tx.PrepareContext(ctx, `
+        INSERT OR REPLACE INTO load_unload_ops
+            (driver_card_number, operation_at, operation_type,
+             latitude, longitude, authentication_status, odometer, source_import_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return 0, fmt.Errorf("prepare load_unload_ops insert: %w", err)
+	}
+	defer stmt.Close()
+	n := 0
+	for _, r := range c.LoadUnloadOps.CardLoadUnloadRecords {
+		if r.TimeStamp.IsZero() {
+			continue
+		}
+		var lat, lng any
+		if r.GeoCoordinates != nil {
+			lat = r.GeoCoordinates.Latitude
+			lng = r.GeoCoordinates.Longitude
+		}
+		if _, err := stmt.ExecContext(ctx, cardNumber, r.TimeStamp.Format(time.RFC3339),
+			r.OperationType, lat, lng, r.AuthenticationStatus, r.VehicleOdometerValue, importID); err != nil {
+			return n, fmt.Errorf("insert load_unload_op %s: %w", r.TimeStamp, err)
+		}
+		n++
+	}
+	return n, nil
+}
+
+func insertLoadTypes(ctx context.Context, tx *sql.Tx, cardNumber string, importID int64, c *ddd.Card) (int, error) {
+	if c.LoadTypeEntries == nil || len(c.LoadTypeEntries.CardLoadTypeEntryRecords) == 0 {
+		return 0, nil
+	}
+	stmt, err := tx.PrepareContext(ctx, `
+        INSERT OR REPLACE INTO load_type_entries
+            (driver_card_number, entered_at, load_type, source_import_id)
+        VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return 0, fmt.Errorf("prepare load_type_entries insert: %w", err)
+	}
+	defer stmt.Close()
+	n := 0
+	for _, r := range c.LoadTypeEntries.CardLoadTypeEntryRecords {
+		if r.TimeStamp.IsZero() {
+			continue
+		}
+		if _, err := stmt.ExecContext(ctx, cardNumber, r.TimeStamp.Format(time.RFC3339),
+			r.LoadType, importID); err != nil {
+			return n, fmt.Errorf("insert load_type_entry %s: %w", r.TimeStamp, err)
+		}
+		n++
+	}
+	return n, nil
+}
+
+// backfillAuthStatus joins EF_Places_Authentication and
+// EF_GNSS_Places_Authentication side-records back onto the matching rows
+// in place_records and gnss_points. Per 2021/1228 §664, an auth entry
+// with no matching timestamp on the data side is ignored.
+func backfillAuthStatus(ctx context.Context, tx *sql.Tx, cardNumber string, c *ddd.Card) error {
+	if len(c.PlacesAuthStatus) > 0 {
+		stmt, err := tx.PrepareContext(ctx, `
+            UPDATE place_records SET authentication_status = ?
+            WHERE driver_card_number = ? AND entry_time = ?`)
+		if err != nil {
+			return fmt.Errorf("prepare place_records auth update: %w", err)
+		}
+		for _, a := range c.PlacesAuthStatus {
+			if a.TimeStamp.IsZero() {
+				continue
+			}
+			if _, err := stmt.ExecContext(ctx, a.AuthenticationStatus, cardNumber,
+				a.TimeStamp.Format(time.RFC3339)); err != nil {
+				stmt.Close()
+				return fmt.Errorf("update place auth %s: %w", a.TimeStamp, err)
+			}
+		}
+		stmt.Close()
+	}
+	if len(c.GnssPlacesAuthStatus) > 0 {
+		stmt, err := tx.PrepareContext(ctx, `
+            UPDATE gnss_points SET authentication_status = ?
+            WHERE driver_card_number = ? AND timestamp = ?`)
+		if err != nil {
+			return fmt.Errorf("prepare gnss_points auth update: %w", err)
+		}
+		for _, a := range c.GnssPlacesAuthStatus {
+			if a.TimeStamp.IsZero() {
+				continue
+			}
+			if _, err := stmt.ExecContext(ctx, a.AuthenticationStatus, cardNumber,
+				a.TimeStamp.Format(time.RFC3339)); err != nil {
+				stmt.Close()
+				return fmt.Errorf("update gnss auth %s: %w", a.TimeStamp, err)
+			}
+		}
+		stmt.Close()
+	}
+	return nil
 }
 
 func formatTime(t time.Time) string {

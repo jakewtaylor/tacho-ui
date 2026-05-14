@@ -325,6 +325,30 @@ func (a *App) GetDriverVehicles(cardNumber string) ([]db.DriverVehicle, error) {
 	return store.GetDriverVehicles(a.ctx, cardNumber)
 }
 
+func (a *App) GetBorderCrossings(cardNumber string) ([]db.BorderCrossing, error) {
+	store, err := a.store()
+	if err != nil {
+		return nil, err
+	}
+	return store.GetBorderCrossings(a.ctx, cardNumber)
+}
+
+func (a *App) GetLoadUnloadOps(cardNumber string) ([]db.LoadUnloadOp, error) {
+	store, err := a.store()
+	if err != nil {
+		return nil, err
+	}
+	return store.GetLoadUnloadOps(a.ctx, cardNumber)
+}
+
+func (a *App) GetLoadTypeEntries(cardNumber string) ([]db.LoadTypeEntry, error) {
+	store, err := a.store()
+	if err != nil {
+		return nil, err
+	}
+	return store.GetLoadTypeEntries(a.ctx, cardNumber)
+}
+
 // ===== Misc =====
 
 // WipeDatabase deletes every imported row and VACUUMs. Intended for testing —

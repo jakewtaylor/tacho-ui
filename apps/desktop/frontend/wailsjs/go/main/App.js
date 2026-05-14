@@ -22,6 +22,10 @@ export function DeleteImport(arg1) {
   return window['go']['main']['App']['DeleteImport'](arg1);
 }
 
+export function GetBorderCrossings(arg1) {
+  return window['go']['main']['App']['GetBorderCrossings'](arg1);
+}
+
 export function GetDailyRecords(arg1) {
   return window['go']['main']['App']['GetDailyRecords'](arg1);
 }
@@ -40,6 +44,14 @@ export function GetEventsAndFaults(arg1) {
 
 export function GetGnssPoints(arg1) {
   return window['go']['main']['App']['GetGnssPoints'](arg1);
+}
+
+export function GetLoadTypeEntries(arg1) {
+  return window['go']['main']['App']['GetLoadTypeEntries'](arg1);
+}
+
+export function GetLoadUnloadOps(arg1) {
+  return window['go']['main']['App']['GetLoadUnloadOps'](arg1);
 }
 
 export function GetPlaceRecords(arg1) {

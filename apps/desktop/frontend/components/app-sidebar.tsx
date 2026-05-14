@@ -1,6 +1,20 @@
 import * as React from "react";
-import { NavLink, useLocation, useParams } from "react-router-dom";
-import { CalendarRange, IdCard, KeyRound, Upload, Users } from "lucide-react";
+import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  CalendarRange,
+  IdCard,
+  KeyRound,
+  Settings,
+  Upload,
+  Users,
+} from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@tacholens/ui/components/dropdown-menu";
 
 import appIcon from "../src/assets/images/appicon.png";
 
@@ -36,6 +50,7 @@ export function AppSidebar({
 }: Props) {
   const { cardNumber } = useParams<{ cardNumber?: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const activeDriver = React.useMemo(() => {
     if (!cardNumber || !drivers) return null;
@@ -51,12 +66,12 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
+        <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:p-0 transition-all">
           <img
             src={appIcon}
             alt=""
             aria-hidden
-            className="size-12 rounded-md"
+            className="size-12 rounded-md group-data-[collapsible=icon]:size-8 transition-all"
           />
           <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
             <span className="truncate font-semibold">TachoLens</span>
@@ -92,18 +107,6 @@ export function AppSidebar({
                   <NavLink to="/" end>
                     <Users />
                     <span>Drivers</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={location.pathname === "/license"}
-                  tooltip="License"
-                >
-                  <NavLink to="/license">
-                    <KeyRound />
-                    <span>License</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -197,11 +200,33 @@ export function AppSidebar({
         )}
       </SidebarContent>
 
-      <SidebarFooter className="group-data-[collapsible=icon]:hidden">
-        <p className="px-2 text-[0.65rem] leading-relaxed text-muted-foreground">
-          Drop a <code className="rounded bg-muted px-1">.ddd</code> file
-          anywhere in the window to import.
-        </p>
+      <SidebarFooter>
+        <div className="flex items-center gap-2 px-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1 group-data-[collapsible=icon]:px-0">
+          <p className="flex-1 text-[0.65rem] leading-relaxed text-muted-foreground group-data-[collapsible=icon]:hidden">
+            Drop a <code className="rounded bg-muted px-1">.ddd</code> file
+            anywhere in the window to import.
+          </p>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              type="button"
+              aria-label="Settings"
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              <Settings className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="right"
+              align="end"
+              sideOffset={8}
+              className="min-w-44"
+            >
+              <DropdownMenuItem onSelect={() => navigate("/license")}>
+                <KeyRound />
+                License
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </SidebarFooter>
 
       <SidebarRail />

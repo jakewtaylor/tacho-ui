@@ -59,20 +59,56 @@ type DailyRecord struct {
 }
 
 // PlaceRecord — snake_case retained (matches shifts.ts PlaceRecord).
+// `authentication_status` is "" on Gen1/Gen2v1 cards and populated on
+// Gen2v2 cards from EF_Places_Authentication.
 type PlaceRecord struct {
 	EntryTime                string `json:"entry_time"`
 	EntryTypeDailyWorkPeriod int    `json:"entry_type_daily_work_period"`
 	DailyWorkPeriodCountry   int    `json:"daily_work_period_country"`
 	DailyWorkPeriodRegion    int    `json:"daily_work_period_region"`
 	VehicleOdometerValue     int    `json:"vehicle_odometer_value"`
+	AuthenticationStatus     string `json:"authentication_status,omitempty"`
 }
 
 // GnssPoint — camelCase (matches gnss.ts GnssPoint).
+// `authenticationStatus` is "" on Gen1/Gen2v1 cards and populated on
+// Gen2v2 cards from EF_GNSS_Places_Authentication.
 type GnssPoint struct {
-	Timestamp string  `json:"timestamp"`
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Odometer  int     `json:"odometer"`
+	Timestamp            string  `json:"timestamp"`
+	Latitude             float64 `json:"latitude"`
+	Longitude            float64 `json:"longitude"`
+	Odometer             int     `json:"odometer"`
+	AuthenticationStatus string  `json:"authenticationStatus,omitempty"`
+}
+
+// BorderCrossing — one row of border_crossings, per 2021/1228 §2.11b.
+// `countryLeft` / `countryEntered` are NationNumeric codes; `0xFF` (255)
+// means "Rest of the World" (vehicle outside any country in the VU's
+// stored digital maps).
+type BorderCrossing struct {
+	CrossedAt            string  `json:"crossedAt"`
+	CountryLeft          int     `json:"countryLeft"`
+	CountryEntered       int     `json:"countryEntered"`
+	Latitude             float64 `json:"latitude"`
+	Longitude            float64 `json:"longitude"`
+	AuthenticationStatus string  `json:"authenticationStatus,omitempty"`
+	Odometer             int     `json:"odometer"`
+}
+
+// LoadUnloadOp — one row of load_unload_ops, per 2021/1228 §2.24d.
+type LoadUnloadOp struct {
+	OperationAt          string  `json:"operationAt"`
+	OperationType        string  `json:"operationType"` // load / unload / simultaneous / unknown
+	Latitude             float64 `json:"latitude"`
+	Longitude            float64 `json:"longitude"`
+	AuthenticationStatus string  `json:"authenticationStatus,omitempty"`
+	Odometer             int     `json:"odometer"`
+}
+
+// LoadTypeEntry — one row of load_type_entries, per 2021/1228 §2.24b.
+type LoadTypeEntry struct {
+	EnteredAt string `json:"enteredAt"`
+	LoadType  string `json:"loadType"` // undefined / goods / passengers / unknown
 }
 
 // CardEvent — camelCase (matches events.ts CardEvent).
