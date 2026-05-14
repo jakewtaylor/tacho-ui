@@ -560,26 +560,30 @@ export function BorderCrossingsPanel({
         <CardTitle>Border crossings</CardTitle>
         <CardDescription>
           Vehicle-unit-detected changes of country and off-map transit
-          (Gen2v2 only). {trips.length - dropoutCount} crossings
-          {dropoutCount > 0 && (
-            <>
-              {" "}· {dropoutCount} GPS dropout{dropoutCount === 1 ? "" : "s"}
-              {" "}
-              <button
-                type="button"
-                className="text-xs underline-offset-4 hover:underline"
-                onClick={() => setShowDropouts((s) => !s)}
-              >
-                {showDropouts ? "(hide)" : "(show)"}
-              </button>
-            </>
-          )}
-          .{" "}
+          (Gen2v2 only). {trips.length - dropoutCount} crossing
+          {trips.length - dropoutCount === 1 ? "" : "s"} shown.
+          {" "}
           <span className="text-muted-foreground">
-            Off-map = the VU couldn't place the vehicle on its onboard digital
-            map (typically at sea on a ferry, or briefly at a port).
+            Off-map = the VU couldn't place the vehicle on its onboard
+            digital map (typically at sea on a ferry, or briefly at a
+            port).
           </span>
         </CardDescription>
+        {dropoutCount > 0 && (
+          <CardAction>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-md border px-3 py-1 text-xs font-medium hover:bg-muted"
+              onClick={() => setShowDropouts((s) => !s)}
+            >
+              <span className="tabular-nums">{dropoutCount}</span>
+              GPS dropout{dropoutCount === 1 ? "" : "s"}
+              <span className="text-muted-foreground">
+                {showDropouts ? "(hide)" : "(show)"}
+              </span>
+            </button>
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent className="px-0">
         <Table>

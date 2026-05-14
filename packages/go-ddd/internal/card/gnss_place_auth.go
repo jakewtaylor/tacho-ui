@@ -78,8 +78,8 @@ func decodeGnssPlaceAuth(slot []byte) (GnssPlaceAuth, error) {
 	return GnssPlaceAuth{
 		TimeStamp:  ts,
 		Accuracy:   int(slot[4]),
-		Latitude:   geoCoordinateToDegrees(latRaw),
-		Longitude:  geoCoordinateToDegrees(lngRaw),
+		Latitude:   geoCoordinateToDegrees(latRaw, false),
+		Longitude:  geoCoordinateToDegrees(lngRaw, true),
 		AuthStatus: auth,
 	}, nil
 }

@@ -70,14 +70,42 @@ func TestDecodeGnss(t *testing.T) {
 //   - -1118  →  −1° 11.8′ E  →  −1.1967° decimal  (Bristol/Bath area UK,
 //     plausible for the sample driver)
 func TestGeoCoordinateWorkedExample(t *testing.T) {
-	got := geoCoordinateToDegrees(51445)
+	got := geoCoordinateToDegrees(51445, false)
 	want := 51 + 44.5/60.0
 	if math.Abs(got-want) > 1e-6 {
 		t.Errorf("geoCoordinateToDegrees(51445) = %v, want %v", got, want)
 	}
-	got = geoCoordinateToDegrees(-1118)
+	got = geoCoordinateToDegrees(-1118, true)
 	want = -(1 + 11.8/60.0)
 	if math.Abs(got-want) > 1e-6 {
 		t.Errorf("geoCoordinateToDegrees(-1118) = %v, want %v", got, want)
+	}
+}
+
+// TestGeoCoordinateOutOfRange pins the "no GPS fix" sentinel behaviour.
+// The spec defines lat as INTEGER(-90000..90001) and lng as
+// INTEGER(-180000..180001) (App. 1 §2.76). Values outside that range —
+// notably 0x7FFFFF (8388607), which some VUs write when no fix is
+// available — must decode to NaN so callers can drop them rather than
+// rendering 8389.0117° points on the map.
+func TestGeoCoordinateOutOfRange(t *testing.T) {
+	// 0x7FFFFF = max signed 24-bit; widely seen on no-fix records.
+	if got := geoCoordinateToDegrees(0x7FFFFF, false); !math.IsNaN(got) {
+		t.Errorf("lat 0x7FFFFF should be NaN, got %v", got)
+	}
+	if got := geoCoordinateToDegrees(-0x800000, true); !math.IsNaN(got) {
+		t.Errorf("lng -0x800000 should be NaN, got %v", got)
+	}
+	// Spec edge: 90001 is the "no info" sentinel for latitude, hence
+	// also NaN despite being just one outside the valid bound. (We
+	// allow it through here — the strict +1 sentinel still decodes,
+	// it's the wildly-out values that get NaN'd.) Adjust if a
+	// downstream consumer needs to distinguish the two.
+	if got := geoCoordinateToDegrees(90001, false); math.IsNaN(got) {
+		t.Errorf("lat 90001 (spec sentinel) should still decode, got NaN")
+	}
+	// Just over: 90002 must be NaN.
+	if got := geoCoordinateToDegrees(90002, false); !math.IsNaN(got) {
+		t.Errorf("lat 90002 (out of spec) should be NaN, got %v", got)
 	}
 }
