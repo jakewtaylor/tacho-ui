@@ -119,6 +119,6 @@ func decodeOneLoadUnload(slot []byte) (LoadUnloadRecord, bool, error) {
 		TimeStamp:     ts,
 		OperationType: op,
 		GnssPlaceAuth: gpa,
-		Odometer:      int(odo),
+		Odometer:      normalizeOdometer(odo),
 	}, true, nil
 }

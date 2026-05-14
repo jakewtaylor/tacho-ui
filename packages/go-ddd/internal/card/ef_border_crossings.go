@@ -81,6 +81,19 @@ func decodeOneBorderCrossing(slot []byte) (BorderCrossingRecord, bool, error) {
 		CountryLeft:    int(slot[0]),
 		CountryEntered: int(slot[1]),
 		GnssPlaceAuth:  gpa,
-		Odometer:       int(odo),
+		Odometer:       normalizeOdometer(odo),
 	}, true, nil
+}
+
+// normalizeOdometer rejects OdometerShort sentinel values. The spec
+// (App. 1 §2.113) defines OdometerShort as INTEGER(0..2^24-1) with an
+// "operating range" of 0..9 999 999 km. The all-ones value 0xFFFFFF
+// (16 777 215) appears in the wild as a "no data" sentinel — same as
+// the GeoCoordinates 0x7FFFFF case. Values outside the operating range
+// are normalised to 0 (caller treats 0 as "no reading").
+func normalizeOdometer(raw uint64) int {
+	if raw >= 10_000_000 {
+		return 0
+	}
+	return int(raw)
 }

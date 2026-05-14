@@ -40,9 +40,12 @@ import { durationMinutes, type CardEvent } from "./events";
 import { eventCategory, eventTypeLabel } from "./eventTypes";
 import {
   deriveBorderTrips,
+  groupIntoJourneys,
   isPhantomDropout,
   type BorderTrip,
+  type Journey,
 } from "./borderCrossings";
+import { ChevronRight } from "lucide-react";
 import type { db } from "../wailsjs/go/models";
 
 const ROW_LIMIT = 50;
@@ -529,163 +532,233 @@ function countryCell(code: number): ReactNode {
   );
 }
 
+function CountryArrowChain({
+  from,
+  via,
+  to,
+  hasOffmap,
+}: {
+  from: number;
+  via: number[];
+  to: number;
+  hasOffmap: boolean;
+}) {
+  const codes = [from, ...via, to];
+  return (
+    <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+      {codes.map((c, i) => (
+        <span key={`${c}-${i}`} className="flex items-center gap-1">
+          {i > 0 && (
+            <ChevronRight className="size-3 text-muted-foreground" />
+          )}
+          <Badge
+            variant={i === 0 || i === codes.length - 1 ? "secondary" : "outline"}
+            className="font-mono"
+            title={nationName(c)}
+          >
+            {nationAlpha(c)}
+          </Badge>
+        </span>
+      ))}
+      {hasOffmap && (
+        <Badge variant="outline" className="ml-2 font-mono text-[10px] text-muted-foreground">
+          off-map leg
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function JourneyRow({
+  journey,
+  isExpanded,
+  onToggle,
+}: {
+  journey: Journey;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const dur = formatDuration(journey.durationMinutes);
+  return (
+    <>
+      <TableRow className="cursor-pointer hover:bg-muted/40" onClick={onToggle}>
+        <TableCell className="pl-4 font-mono text-xs">
+          <div>{formatTimestamp(journey.startAt)}</div>
+          <div className="text-[10px] text-muted-foreground">
+            {dur} · {journey.legCount} leg{journey.legCount === 1 ? "" : "s"}
+          </div>
+        </TableCell>
+        <TableCell colSpan={3}>
+          <CountryArrowChain
+            from={journey.from}
+            via={journey.via}
+            to={journey.to}
+            hasOffmap={journey.hasOffmap}
+          />
+        </TableCell>
+        <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
+          {journey.totalKm > 0 ? `${journey.totalKm.toLocaleString()} km` : "—"}
+          <div className="text-[10px] text-muted-foreground">
+            <ChevronRight
+              className={
+                "inline size-3 transition-transform " +
+                (isExpanded ? "rotate-90" : "")
+              }
+            />
+            {isExpanded ? "hide legs" : "show legs"}
+          </div>
+        </TableCell>
+      </TableRow>
+      {isExpanded &&
+        journey.legs.map((leg, i) => (
+          <JourneyLegRow key={`leg-${journey.startAt}-${i}`} leg={leg} />
+        ))}
+    </>
+  );
+}
+
+function JourneyLegRow({ leg }: { leg: BorderTrip }) {
+  if (leg.kind === "crossing") {
+    return (
+      <TableRow className="bg-muted/20 text-xs">
+        <TableCell className="pl-10 font-mono text-muted-foreground">
+          {formatTimestamp(leg.at)}
+        </TableCell>
+        <TableCell>{countryCell(leg.from)}</TableCell>
+        <TableCell>{countryCell(leg.to)}</TableCell>
+        <TableCell>
+          {locationCell(leg.latitude, leg.longitude, leg.authenticationStatus)}
+        </TableCell>
+        <TableCell className="pr-4 text-right font-mono tabular-nums">
+          {leg.odometer.toLocaleString()} km
+        </TableCell>
+      </TableRow>
+    );
+  }
+  if (leg.kind === "offmap") {
+    const dur = durationMins(leg.leftAt, leg.rejoinedAt);
+    return (
+      <TableRow className="bg-muted/20 text-xs">
+        <TableCell className="pl-10 font-mono text-muted-foreground">
+          {formatTimestamp(leg.leftAt)}
+          <div className="text-[10px]">
+            off-map for {formatDuration(dur)}
+          </div>
+        </TableCell>
+        <TableCell>{countryCell(leg.from)}</TableCell>
+        <TableCell>{countryCell(leg.to)}</TableCell>
+        <TableCell>
+          {locationCell(
+            leg.fromLatitude,
+            leg.fromLongitude,
+            leg.authenticationStatus,
+          )}
+        </TableCell>
+        <TableCell className="pr-4 text-right font-mono tabular-nums">
+          {leg.odometer.toLocaleString()} km
+          {leg.kmTravelled > 1 && (
+            <div className="text-[10px]">
+              +{leg.kmTravelled.toLocaleString()} km off-map
+            </div>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  }
+  // orphan
+  return (
+    <TableRow className="bg-muted/20 text-xs">
+      <TableCell className="pl-10 font-mono text-muted-foreground">
+        {formatTimestamp(leg.at)}
+      </TableCell>
+      <TableCell>{countryCell(leg.from)}</TableCell>
+      <TableCell>{countryCell(leg.to)}</TableCell>
+      <TableCell>
+        {locationCell(leg.latitude, leg.longitude, leg.authenticationStatus)}
+      </TableCell>
+      <TableCell className="pr-4 text-right font-mono tabular-nums">
+        {leg.odometer.toLocaleString()} km
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export function BorderCrossingsPanel({
   crossings,
 }: {
   crossings: db.BorderCrossing[];
 }) {
-  const [showDropouts, setShowDropouts] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const trips = useMemo(() => deriveBorderTrips(crossings), [crossings]);
   const dropoutCount = useMemo(
     () => trips.filter(isPhantomDropout).length,
     [trips],
   );
-
-  const visible = useMemo(() => {
-    const filtered = showDropouts
-      ? trips
-      : trips.filter((t) => !isPhantomDropout(t));
-    // Newest first, truncate.
-    return filtered
+  const journeys = useMemo(() => groupIntoJourneys(trips), [trips]);
+  const visibleJourneys = useMemo(() => {
+    // Newest first, then cap. 25 journeys ≈ 100+ crossings if all expanded.
+    return journeys
       .slice()
-      .sort((a, b) => tripWhen(b).localeCompare(tripWhen(a)))
-      .slice(0, ROW_LIMIT);
-  }, [trips, showDropouts]);
+      .sort((a, b) => b.startAt.localeCompare(a.startAt))
+      .slice(0, 25);
+  }, [journeys]);
 
-  if (trips.length === 0) return null;
+  if (journeys.length === 0) return null;
+
+  const toggle = (key: string) =>
+    setExpanded((m) => ({ ...m, [key]: !m[key] }));
+
   return (
     <Card>
       <CardHeader className="border-b">
         <CardTitle>Border crossings</CardTitle>
         <CardDescription>
-          Vehicle-unit-detected changes of country and off-map transit
-          (Gen2v2 only). {trips.length - dropoutCount} crossing
-          {trips.length - dropoutCount === 1 ? "" : "s"} shown.
-          {" "}
-          <span className="text-muted-foreground">
-            Off-map = the VU couldn't place the vehicle on its onboard
-            digital map (typically at sea on a ferry, or briefly at a
-            port).
-          </span>
-        </CardDescription>
-        {dropoutCount > 0 && (
-          <CardAction>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-md border px-3 py-1 text-xs font-medium hover:bg-muted"
-              onClick={() => setShowDropouts((s) => !s)}
-            >
-              <span className="tabular-nums">{dropoutCount}</span>
-              GPS dropout{dropoutCount === 1 ? "" : "s"}
+          {journeys.length} journey{journeys.length === 1 ? "" : "s"} grouped
+          from {trips.length - dropoutCount} crossing
+          {trips.length - dropoutCount === 1 ? "" : "s"} (Gen2v2 only). A new
+          journey starts after a 6+ hour gap. Click a row to expand its legs.
+          {dropoutCount > 0 && (
+            <>
+              {" "}
               <span className="text-muted-foreground">
-                {showDropouts ? "(hide)" : "(show)"}
+                {dropoutCount} phantom GPS dropout
+                {dropoutCount === 1 ? " was" : "s were"} filtered out — the
+                vehicle never crossed a border.
               </span>
-            </button>
-          </CardAction>
-        )}
+            </>
+          )}
+        </CardDescription>
       </CardHeader>
       <CardContent className="px-0">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="pl-4">When</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>To</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead className="pr-4 text-right">Odometer</TableHead>
+              <TableHead colSpan={3}>Route</TableHead>
+              <TableHead className="pr-4 text-right">Distance</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visible.map((t, i) => {
-              if (t.kind === "crossing") {
-                return (
-                  <TableRow key={`x-${t.at}-${i}`}>
-                    <TableCell className="pl-4 font-mono text-xs">
-                      {formatTimestamp(t.at)}
-                    </TableCell>
-                    <TableCell>{countryCell(t.from)}</TableCell>
-                    <TableCell>{countryCell(t.to)}</TableCell>
-                    <TableCell>
-                      {locationCell(
-                        t.latitude,
-                        t.longitude,
-                        t.authenticationStatus,
-                      )}
-                    </TableCell>
-                    <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
-                      {t.odometer.toLocaleString()} km
-                    </TableCell>
-                  </TableRow>
-                );
-              }
-              if (t.kind === "offmap") {
-                const dur = durationMins(t.leftAt, t.rejoinedAt);
-                const isDropout = t.classification === "dropout";
-                return (
-                  <TableRow key={`o-${t.leftAt}-${i}`}>
-                    <TableCell className="pl-4 font-mono text-xs">
-                      {formatTimestamp(t.leftAt)}
-                      <div className="text-[10px] text-muted-foreground">
-                        off-map for {formatDuration(dur)}
-                      </div>
-                    </TableCell>
-                    <TableCell>{countryCell(t.from)}</TableCell>
-                    <TableCell>
-                      {isDropout ? (
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-[10px] text-muted-foreground"
-                          title="Vehicle never crossed a border — GPS or map briefly couldn't place it"
-                        >
-                          GPS dropout
-                        </Badge>
-                      ) : (
-                        countryCell(t.to)
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {locationCell(
-                        t.fromLatitude,
-                        t.fromLongitude,
-                        t.authenticationStatus,
-                      )}
-                    </TableCell>
-                    <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
-                      {t.odometer.toLocaleString()} km
-                      {t.kmTravelled > 1 && (
-                        <div className="text-[10px] text-muted-foreground">
-                          +{t.kmTravelled.toLocaleString()} km off-map
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              }
-              // orphan
+            {visibleJourneys.map((j, i) => {
+              const key = `${j.startAt}-${i}`;
               return (
-                <TableRow key={`orphan-${t.at}-${i}`}>
-                  <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
-                    {formatTimestamp(t.at)}
-                  </TableCell>
-                  <TableCell>{countryCell(t.from)}</TableCell>
-                  <TableCell>{countryCell(t.to)}</TableCell>
-                  <TableCell>
-                    {locationCell(
-                      t.latitude,
-                      t.longitude,
-                      t.authenticationStatus,
-                    )}
-                  </TableCell>
-                  <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
-                    {t.odometer.toLocaleString()} km
-                  </TableCell>
-                </TableRow>
+                <JourneyRow
+                  key={key}
+                  journey={j}
+                  isExpanded={!!expanded[key]}
+                  onToggle={() => toggle(key)}
+                />
               );
             })}
           </TableBody>
         </Table>
       </CardContent>
+      {journeys.length > 25 && (
+        <CardFooter className="text-xs text-muted-foreground">
+          Showing newest 25 of {journeys.length} journeys.
+        </CardFooter>
+      )}
     </Card>
   );
 }
