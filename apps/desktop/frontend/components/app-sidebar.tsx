@@ -51,12 +51,12 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
+        <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:p-0 transition-all">
           <img
             src={appIcon}
             alt=""
             aria-hidden
-            className="size-12 rounded-md"
+            className="size-12 rounded-md group-data-[collapsible=icon]:size-8 transition-all"
           />
           <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
             <span className="truncate font-semibold">TachoLens</span>
