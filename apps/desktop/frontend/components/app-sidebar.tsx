@@ -1,6 +1,13 @@
 import * as React from "react";
 import { NavLink, useLocation, useParams } from "react-router-dom";
-import { CalendarRange, IdCard, KeyRound, Upload, Users } from "lucide-react";
+import {
+  CalendarRange,
+  IdCard,
+  KeyRound,
+  Settings,
+  Upload,
+  Users,
+} from "lucide-react";
 
 import appIcon from "../src/assets/images/appicon.png";
 
@@ -95,18 +102,6 @@ export function AppSidebar({
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={location.pathname === "/license"}
-                  tooltip="License"
-                >
-                  <NavLink to="/license">
-                    <KeyRound />
-                    <span>License</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -197,8 +192,30 @@ export function AppSidebar({
         )}
       </SidebarContent>
 
-      <SidebarFooter className="group-data-[collapsible=icon]:hidden">
-        <p className="px-2 text-[0.65rem] leading-relaxed text-muted-foreground">
+      <SidebarFooter>
+        <SidebarGroup className="p-0">
+          <SidebarGroupLabel className="flex items-center gap-1.5">
+            <Settings className="size-3.5" />
+            Settings
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/license"}
+                  tooltip="License"
+                >
+                  <NavLink to="/license">
+                    <KeyRound />
+                    <span>License</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <p className="px-2 text-[0.65rem] leading-relaxed text-muted-foreground group-data-[collapsible=icon]:hidden">
           Drop a <code className="rounded bg-muted px-1">.ddd</code> file
           anywhere in the window to import.
         </p>
