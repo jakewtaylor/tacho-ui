@@ -42,17 +42,10 @@ export function JourneyMap({
 }) {
   const waypoints = useMemo<Waypoint[]>(() => {
     const out: Waypoint[] = [];
-    // Emit waypoints from each leg.
     for (const leg of journey.legs) {
       addLegWaypoints(leg, out);
     }
-    // Filter and add GNSS samples that fall within the journey window.
-    const startMs = Date.parse(journey.startAt);
-    const endMs = Date.parse(journey.endAt);
-    for (const p of gnssPoints) {
-      const t = Date.parse(p.timestamp);
-      if (t < startMs || t > endMs) continue;
-      if (p.latitude === 0 && p.longitude === 0) continue;
+    for (const p of contextGnssPoints(journey, gnssPoints)) {
       out.push({
         ts: p.timestamp,
         lat: p.latitude,
@@ -61,7 +54,6 @@ export function JourneyMap({
         title: `${p.timestamp.replace("T", " ").replace("Z", "")} · ${p.latitude.toFixed(3)}, ${p.longitude.toFixed(3)}`,
       });
     }
-    // Sort chronologically.
     out.sort((a, b) => a.ts.localeCompare(b.ts));
     return out;
   }, [journey, gnssPoints]);
@@ -112,6 +104,56 @@ export function JourneyMap({
       </APIProvider>
     </div>
   );
+}
+
+// contextGnssPoints returns every GNSS sample within the journey's time
+// window, plus the closest preceding sample (the "lead-in") and the
+// closest following sample (the "lead-out") if they fall within
+// CONTEXT_WINDOW_MS of the journey's start / end. The lead-in/lead-out
+// pair guarantees that a single-crossing journey (zero-duration window
+// with one border waypoint) still has enough points to draw a line.
+//
+// Cap stops us from reaching back into unrelated activity: 6 hours
+// matches the journey-gap rule, so the surrounding pings come from the
+// same continuous driving day.
+const CONTEXT_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+function contextGnssPoints(
+  journey: Journey,
+  gnssPoints: db.GnssPoint[],
+): db.GnssPoint[] {
+  const valid = gnssPoints.filter(
+    (p) => p.latitude !== 0 || p.longitude !== 0,
+  );
+  if (valid.length === 0) return [];
+  // Defensive: assume the loader returned ascending order, but sort
+  // anyway so we can short-circuit cleanly.
+  const sorted = [...valid].sort((a, b) =>
+    a.timestamp.localeCompare(b.timestamp),
+  );
+  const startMs = Date.parse(journey.startAt);
+  const endMs = Date.parse(journey.endAt);
+  const within: db.GnssPoint[] = [];
+  let leadIn: db.GnssPoint | null = null;
+  let leadOut: db.GnssPoint | null = null;
+  for (const p of sorted) {
+    const t = Date.parse(p.timestamp);
+    if (t < startMs) {
+      // Keep overwriting; the closest preceding sample wins.
+      if (startMs - t <= CONTEXT_WINDOW_MS) leadIn = p;
+    } else if (t > endMs) {
+      // First sample past the end is the closest; capture and stop.
+      if (t - endMs <= CONTEXT_WINDOW_MS) leadOut = p;
+      break;
+    } else {
+      within.push(p);
+    }
+  }
+  const out: db.GnssPoint[] = [];
+  if (leadIn) out.push(leadIn);
+  out.push(...within);
+  if (leadOut) out.push(leadOut);
+  return out;
 }
 
 function addLegWaypoints(leg: BorderTrip, out: Waypoint[]) {
