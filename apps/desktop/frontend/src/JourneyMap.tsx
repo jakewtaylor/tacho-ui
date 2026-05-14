@@ -25,11 +25,15 @@ type Waypoint = {
   lat: number;
   lng: number;
   kind: "border" | "gnss";
-  // For border markers: the country code to label with. For "enter"
-  // markers (vehicle entering this country) the chip is filled; for
-  // "leave" markers it's outlined.
-  countryCode?: number;
-  countryRole?: "leave" | "enter";
+  // For border markers: render a "F → B" pill capturing the transition
+  // direction. `role` controls visual style and which side of the
+  // arrow gets a country code:
+  //   simple — both sides shown, filled  ("F → B")
+  //   leave  — only fromCountry shown    ("F →")  outlined
+  //   enter  — only toCountry shown      ("→ B")  filled
+  fromCountry?: number;
+  toCountry?: number;
+  role?: "simple" | "leave" | "enter";
   title: string; // hover tooltip
 };
 
@@ -94,7 +98,11 @@ export function JourneyMap({
               title={w.title}
             >
               {w.kind === "border" ? (
-                <BorderPin code={w.countryCode!} role={w.countryRole!} />
+                <BorderPin
+                  from={w.fromCountry}
+                  to={w.toCountry}
+                  role={w.role ?? "simple"}
+                />
               ) : (
                 <GnssDot />
               )}
@@ -164,23 +172,28 @@ function addLegWaypoints(leg: BorderTrip, out: Waypoint[]) {
         lat: leg.latitude,
         lng: leg.longitude,
         kind: "border",
-        countryCode: leg.to,
-        countryRole: "enter",
-        title: `${leg.at.replace("T", " ").replace("Z", "")} · entered ${nationAlpha(leg.to)} from ${nationAlpha(leg.from)}`,
+        fromCountry: leg.from,
+        toCountry: leg.to,
+        role: "simple",
+        title: `${leg.at.replace("T", " ").replace("Z", "")} · ${nationAlpha(leg.from)} → ${nationAlpha(leg.to)}`,
       });
     }
     return;
   }
   if (leg.kind === "offmap") {
+    // Two pins for the same logical transition — one at the leave coord
+    // (outlined "F →") and one at the rejoin coord (filled "→ B"). The
+    // gap in the polyline between them is the off-map portion.
     if (leg.fromLatitude || leg.fromLongitude) {
       out.push({
         ts: leg.leftAt,
         lat: leg.fromLatitude,
         lng: leg.fromLongitude,
         kind: "border",
-        countryCode: leg.from,
-        countryRole: "leave",
-        title: `${leg.leftAt.replace("T", " ").replace("Z", "")} · left ${nationAlpha(leg.from)} (off-map)`,
+        fromCountry: leg.from,
+        toCountry: leg.to,
+        role: "leave",
+        title: `${leg.leftAt.replace("T", " ").replace("Z", "")} · left ${nationAlpha(leg.from)} for ${nationAlpha(leg.to)} (off-map)`,
       });
     }
     if (leg.toLatitude || leg.toLongitude) {
@@ -189,9 +202,10 @@ function addLegWaypoints(leg: BorderTrip, out: Waypoint[]) {
         lat: leg.toLatitude,
         lng: leg.toLongitude,
         kind: "border",
-        countryCode: leg.to,
-        countryRole: "enter",
-        title: `${leg.rejoinedAt.replace("T", " ").replace("Z", "")} · entered ${nationAlpha(leg.to)} (rejoined map)`,
+        fromCountry: leg.from,
+        toCountry: leg.to,
+        role: "enter",
+        title: `${leg.rejoinedAt.replace("T", " ").replace("Z", "")} · entered ${nationAlpha(leg.to)} from ${nationAlpha(leg.from)} (rejoined map)`,
       });
     }
     return;
@@ -203,9 +217,10 @@ function addLegWaypoints(leg: BorderTrip, out: Waypoint[]) {
       lat: leg.latitude,
       lng: leg.longitude,
       kind: "border",
-      countryCode: leg.to,
-      countryRole: "enter",
-      title: `${leg.at.replace("T", " ").replace("Z", "")} · partial record`,
+      fromCountry: leg.from,
+      toCountry: leg.to,
+      role: "simple",
+      title: `${leg.at.replace("T", " ").replace("Z", "")} · partial record (${nationAlpha(leg.from)} → ${nationAlpha(leg.to)})`,
     });
   }
 }
@@ -248,13 +263,26 @@ function RoutePolyline({ waypoints }: { waypoints: Waypoint[] }) {
 }
 
 function BorderPin({
-  code,
+  from,
+  to,
   role,
 }: {
-  code: number;
-  role: "leave" | "enter";
+  from?: number;
+  to?: number;
+  role: "simple" | "leave" | "enter";
 }) {
-  const filled = role === "enter";
+  // `leave` shows only the country left (the country `to` is reached
+  // later via off-map travel). `enter` shows only the country entered.
+  // `simple` shows the full transition.
+  const filled = role !== "leave";
+  let label: string;
+  if (role === "leave") {
+    label = `${nationAlpha(from)} →`;
+  } else if (role === "enter") {
+    label = `→ ${nationAlpha(to)}`;
+  } else {
+    label = `${nationAlpha(from)} → ${nationAlpha(to)}`;
+  }
   return (
     <div
       style={{
@@ -264,17 +292,18 @@ function BorderPin({
         padding: "2px 6px",
         borderRadius: 6,
         fontSize: 10,
-        fontFamily:
-          "ui-monospace, SFMono-Regular, Menlo, monospace",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
         fontWeight: 600,
+        whiteSpace: "nowrap",
         background: filled ? "rgb(59 130 246)" : "rgba(15, 23, 42, 0.85)",
         color: filled ? "white" : "rgb(226 232 240)",
-        border: "1px solid " + (filled ? "rgb(59 130 246)" : "rgb(71 85 105)"),
+        border:
+          "1px solid " + (filled ? "rgb(59 130 246)" : "rgb(71 85 105)"),
         boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
         transform: "translateY(-50%)",
       }}
     >
-      {nationAlpha(code)}
+      {label}
     </div>
   );
 }
