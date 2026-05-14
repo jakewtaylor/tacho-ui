@@ -13,6 +13,11 @@ import {
   CardTitle,
 } from "@tacholens/ui/components/card";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@tacholens/ui/components/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -563,13 +568,22 @@ function CountryArrowChain({
         </span>
       ))}
       {hasOffmap && (
-        <Badge
-          variant="outline"
-          className="ml-2 font-mono text-[10px] text-muted-foreground"
-          title="At some point in this journey the vehicle was off the VU's onboard digital map — usually a ferry crossing, occasionally a stretch of unmapped road. Expand the journey to see when and where."
-        >
-          via off-map (ferry?)
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              variant="outline"
+              className="ml-2 cursor-help font-mono text-[10px] text-muted-foreground"
+            >
+              via off-map (ferry?)
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            At some point in this journey the vehicle was off the VU's
+            onboard digital map — usually a ferry crossing, occasionally a
+            stretch of unmapped road. Expand the journey to see when and
+            where.
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );
