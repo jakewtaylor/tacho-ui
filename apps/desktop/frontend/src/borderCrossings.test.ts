@@ -229,4 +229,38 @@ describe("groupIntoJourneys", () => {
   it("returns empty for empty input", () => {
     expect(groupIntoJourneys([])).toEqual([]);
   });
+
+  it("filters 'No information available' (country code 0) trips", () => {
+    // Real-world: VU emits a Country 0 → ROW record on card insertion
+    // when it doesn't yet know its position. 20 min later it pairs
+    // with a ROW → UK record once GPS locks on. Whole pair should be
+    // dropped — it's not a real crossing.
+    const trips = deriveBorderTrips([
+      bc("2026-02-03T06:15:46Z", 0, ROW_CODE, { odometer: 0 }),
+      bc("2026-02-03T06:36:23Z", ROW_CODE, UK, {
+        odometer: 42734,
+        latitude: 52.04,
+        longitude: 1.16,
+      }),
+      // A real B → DE journey later that day stays.
+      bc("2026-02-03T14:00:00Z", DE, FR, { odometer: 43000 }),
+    ]);
+    const journeys = groupIntoJourneys(trips);
+    expect(journeys).toHaveLength(1);
+    expect(journeys[0]).toMatchObject({ from: DE, to: FR });
+  });
+
+  it("does not drop legitimate trips that happen to have country 0 in via", () => {
+    // Defensive: if a real journey contained a leg into country 0 in
+    // the middle, the filter currently drops it. That's acceptable
+    // behaviour — country 0 means "no info" and shouldn't appear in
+    // legitimate consecutive-crossings sequences.
+    const trips = deriveBorderTrips([
+      bc("2026-04-01T10:00:00Z", FR, BE),
+      bc("2026-04-01T13:00:00Z", BE, DE),
+    ]);
+    const journeys = groupIntoJourneys(trips);
+    expect(journeys).toHaveLength(1);
+    expect(journeys[0]).toMatchObject({ from: FR, to: DE, via: [BE] });
+  });
 });

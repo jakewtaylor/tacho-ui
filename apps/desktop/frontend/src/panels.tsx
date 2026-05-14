@@ -41,6 +41,7 @@ import { eventCategory, eventTypeLabel } from "./eventTypes";
 import {
   deriveBorderTrips,
   groupIntoJourneys,
+  isNoInfoEvent,
   isPhantomDropout,
   type BorderTrip,
   type Journey,
@@ -708,6 +709,11 @@ export function BorderCrossingsPanel({
     () => trips.filter(isPhantomDropout).length,
     [trips],
   );
+  const noInfoCount = useMemo(
+    () =>
+      trips.filter((t) => !isPhantomDropout(t) && isNoInfoEvent(t)).length,
+    [trips],
+  );
   const journeys = useMemo(() => groupIntoJourneys(trips), [trips]);
   const visibleJourneys = useMemo(() => {
     // Newest first, then cap. 25 journeys ≈ 100+ crossings if all expanded.
@@ -738,6 +744,17 @@ export function BorderCrossingsPanel({
                 {dropoutCount} phantom GPS dropout
                 {dropoutCount === 1 ? " was" : "s were"} filtered out — the
                 vehicle never crossed a border.
+              </span>
+            </>
+          )}
+          {noInfoCount > 0 && (
+            <>
+              {" "}
+              <span className="text-muted-foreground">
+                {noInfoCount} "no-information" event
+                {noInfoCount === 1 ? " was" : "s were"} filtered out — the VU
+                emits these on card insertion before GPS locks on, not real
+                crossings.
               </span>
             </>
           )}

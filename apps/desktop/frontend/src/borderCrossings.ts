@@ -189,6 +189,19 @@ export function isPhantomDropout(t: BorderTrip): boolean {
   return t.kind === "offmap" && t.classification === "dropout";
 }
 
+/**
+ * isNoInfoEvent reports whether a derived trip is really a "no
+ * information available" marker rather than a real border crossing.
+ * The VU emits these on card insertion when it doesn't yet know what
+ * country the vehicle is in (NationNumeric 0 = "No information
+ * available", per Reg. 1360/2002 §2.72). They typically pair with the
+ * subsequent ROW→X event when GPS locks on, producing a phantom
+ * "0 → X" journey that's neither a ferry nor a real crossing.
+ */
+export function isNoInfoEvent(t: BorderTrip): boolean {
+  return t.from === 0 || t.to === 0;
+}
+
 // --- Journey grouping ---------------------------------------------------
 //
 // A *journey* is a sequence of consecutive border crossings without a
@@ -227,7 +240,8 @@ export function groupIntoJourneys(
 ): Journey[] {
   const gapMs = opts.gapMs ?? DEFAULT_JOURNEY_GAP_MS;
   const usable = trips.filter(
-    (t) => t.kind !== "orphan" && !isPhantomDropout(t),
+    (t) =>
+      t.kind !== "orphan" && !isPhantomDropout(t) && !isNoInfoEvent(t),
   );
   if (usable.length === 0) return [];
 
