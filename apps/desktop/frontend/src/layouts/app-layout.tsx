@@ -205,6 +205,7 @@ export function AppLayout() {
           drivers={drivers}
           triggerImport={open}
           importing={importing}
+          className="z-20"
         />
         <SidebarInset>
           <Topbar drivers={drivers} loading={isLoading} />
@@ -274,7 +275,7 @@ function Topbar({
   const crumbs = buildBreadcrumbs(location.pathname, params, drivers);
 
   return (
-    <header className="sticky top-0 z-0 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 md:px-6">
+    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 md:px-6">
       <SidebarTrigger className="-ml-1" />
       <Separator
         orientation="vertical"
