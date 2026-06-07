@@ -11,6 +11,7 @@ import {
   driverSummaryFromProfile,
 } from "../panels";
 import { MapPanel } from "../MapPanel";
+import { VerificationBadge } from "../VerificationBadge";
 import { pageTitle, useDocumentTitle } from "../useDocumentTitle";
 import type { DriverLoaderData } from "../loaders";
 
@@ -28,7 +29,10 @@ export function Overview() {
 
   return (
     <div className="flex flex-col gap-6">
-      <DriverSummaryPanel summary={summary} />
+      <DriverSummaryPanel
+        summary={summary}
+        action={<VerificationBadge summary={data.signatureSummary} />}
+      />
       <ActivityPanel cardNumber={data.cardNumber} records={data.dailyRecords} />
       <MapPanel points={data.gnssPoints} />
       <ShiftsPanel

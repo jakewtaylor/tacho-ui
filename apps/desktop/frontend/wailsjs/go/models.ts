@@ -188,6 +188,24 @@ export namespace db {
 	        this.odoEnd = source["odoEnd"];
 	    }
 	}
+	export class EFSignatureRow {
+	    fid: number;
+	    generation: number;
+	    status: string;
+	    reason?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new EFSignatureRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fid = source["fid"];
+	        this.generation = source["generation"];
+	        this.status = source["status"];
+	        this.reason = source["reason"];
+	    }
+	}
 	export class GnssPoint {
 	    timestamp: string;
 	    latitude: number;
@@ -309,6 +327,46 @@ export namespace db {
 	        this.vehicle_odometer_value = source["vehicle_odometer_value"];
 	        this.authentication_status = source["authentication_status"];
 	    }
+	}
+	export class SignatureSummary {
+	    verified: boolean;
+	    chainValid: boolean;
+	    verifiedCount: number;
+	    failedCount: number;
+	    unverifiableCount: number;
+	    efs: EFSignatureRow[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SignatureSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.verified = source["verified"];
+	        this.chainValid = source["chainValid"];
+	        this.verifiedCount = source["verifiedCount"];
+	        this.failedCount = source["failedCount"];
+	        this.unverifiableCount = source["unverifiableCount"];
+	        this.efs = this.convertValues(source["efs"], EFSignatureRow);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class WipeStats {
 	    drivers: number;

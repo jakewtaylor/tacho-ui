@@ -25,6 +25,8 @@ export function GetEventsAndFaults(arg1:string):Promise<Array<db.CardEvent>>;
 
 export function GetGnssPoints(arg1:string):Promise<Array<db.GnssPoint>>;
 
+export function GetLatestSignatureSummary(arg1:string):Promise<db.SignatureSummary>;
+
 export function GetLoadTypeEntries(arg1:string):Promise<Array<db.LoadTypeEntry>>;
 
 export function GetLoadUnloadOps(arg1:string):Promise<Array<db.LoadUnloadOp>>;

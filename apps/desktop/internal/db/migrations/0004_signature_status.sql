@@ -1,0 +1,23 @@
+-- Per-import signature verification summary, produced by ddd.ParseCard
+-- when the importer can wire up a real Verifier (i.e. an ERCA root
+-- key is embedded under packages/go-ddd/pki/). Stored as a JSON blob
+-- so the schema can evolve as the verifier reports finer-grained
+-- diagnostics without further migrations.
+--
+-- Shape (mirrors ddd.SignatureSummary):
+--   {
+--     "chain_valid":         bool,
+--     "verified_count":      int,
+--     "failed_count":        int,
+--     "unverifiable_count":  int,
+--     "verified":            bool,   -- top-level Card.Verified
+--     "ef_signatures": [
+--       { "fid": uint16, "generation": int,
+--         "status": "verified|failed|unverifiable",
+--         "reason": string  -- only for non-verified
+--       },
+--       ...
+--     ]
+--   }
+ALTER TABLE imports
+    ADD COLUMN signature_summary_json TEXT NOT NULL DEFAULT '{}';

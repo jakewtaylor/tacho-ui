@@ -52,13 +52,32 @@ type Card struct {
 }
 
 // SignatureSummary records the outcome of signature verification across
-// every EF on the card. Phase A always returns an empty summary with
-// ChainValid=false.
+// every EF on the card. ChainValid is true when the ERCA → MSCA →
+// equipment certificate chain validates; it can be true while
+// individual EF signatures still fail (in which case those specific
+// EFs are listed in EFs with status="failed"). Phase B.1 (current)
+// reports everything as unverifiable until a real Verifier is plugged
+// in via the WithVerifier ParseOption.
 type SignatureSummary struct {
-	ChainValid     bool     `json:"chain_valid"`
-	VerifiedEFs    []uint16 `json:"verified_efs,omitempty"`
-	FailedEFs      []uint16 `json:"failed_efs,omitempty"`
-	UnverifiableEF []uint16 `json:"unverifiable_efs,omitempty"`
+	ChainValid bool          `json:"chain_valid"`
+	EFs        []EFSignature `json:"ef_signatures,omitempty"`
+	// Aggregates over EFs, exposed for convenience so callers don't
+	// have to walk the list to render summary chips.
+	VerifiedCount     int `json:"verified_count"`
+	FailedCount       int `json:"failed_count"`
+	UnverifiableCount int `json:"unverifiable_count"`
+}
+
+// EFSignature is the per-EF verification result. Order in the slice
+// matches the order EFs appeared in the .ddd file.
+type EFSignature struct {
+	FID        uint16 `json:"fid"`
+	Generation int    `json:"generation"`
+	Status     string `json:"status"` // "verified" | "failed" | "unverifiable"
+	// Reason is populated when status != "verified" — typically a short
+	// human-readable description (e.g. "signature mismatch",
+	// "no MSCA certificate available", "no verifier configured").
+	Reason string `json:"reason,omitempty"`
 }
 
 // CardIdent — EF_Identification (App. 2 §4.2.1). Contains the card's

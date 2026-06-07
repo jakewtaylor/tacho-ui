@@ -11,40 +11,103 @@ import (
 // ParseCard parses the contents of a driver-card .ddd download into a
 // typed Card. The TLV framing is verified, every recognised elementary
 // file is decoded, and unrecognised EFs are silently skipped so the
-// parser can tolerate new card revisions without breaking. Signature
-// verification is not performed in Phase A — Card.Verified will read
-// false.
+// parser can tolerate new card revisions without breaking.
+//
+// Signature handling: each signature TLV record is paired with the
+// immediately preceding data record (same FID, same generation) and
+// fed to the Verifier configured via WithVerifier. The default
+// verifier reports every EF as unverifiable — see verifier.go. The
+// per-EF results land on Card.Signature.EFs.
 //
 // Per-EF decoder failures are non-fatal: they are appended to
 // Card.DecodeErrors and parsing continues with the next record. This
 // matches upstream behaviour and ensures a single malformed/unknown EF
 // can't black-hole the whole card. Framing errors (truncated TLV) still
 // terminate the parse.
-func ParseCard(data []byte) (*Card, error) {
+func ParseCard(data []byte, opts ...ParseOption) (*Card, error) {
 	if len(data) == 0 {
 		return nil, ErrEmpty
 	}
+	cfg := resolveOpts(opts)
 
 	c := &Card{}
+	// pending tracks the last data record seen. When a sig record
+	// arrives we pair it with pending (App. 7 §3.2 guarantees the
+	// adjacency). When the *next* data record arrives without a sig
+	// in between, the previous one was unsigned (e.g. cert EFs at
+	// C100 / C108) — flush it with Signature nil so the verifier can
+	// still collect certs.
+	flush := func(prev tlv.Record, sig []byte) {
+		cfg.verifier.Add(SignedEF{
+			FID:        prev.FID,
+			Generation: prev.Type.Generation(),
+			Body:       prev.Value,
+			Signature:  sig,
+		})
+	}
+	var pending *tlv.Record
 	err := tlv.Walk(data, func(rec tlv.Record) error {
 		if rec.Type.IsSignature() {
-			// Phase B: feed the signature bytes into the verifier
-			// alongside the immediately preceding data record. For now,
-			// ignore signatures entirely.
+			if pending != nil && pending.FID == rec.FID &&
+				pending.Type.Generation() == rec.Type.Generation() {
+				flush(*pending, rec.Value)
+				pending = nil
+			}
+			// A signature without a matching preceding data record is
+			// invalid framing per the spec, but we shrug and continue
+			// — Card.DecodeErrors will surface anything that mattered.
 			return nil
 		}
 		if !rec.Type.IsData() {
 			return nil
 		}
+		// New data record. Flush any pending unsigned record first.
+		if pending != nil {
+			flush(*pending, nil)
+		}
+		// Decode the EF body. The pending pointer is set regardless of
+		// decode success — the signature is over the raw bytes, not
+		// our parsed view, so it can still be verified.
 		if err := dispatchCardEF(c, rec); err != nil {
 			c.DecodeErrors = append(c.DecodeErrors, err.Error())
 		}
+		// Stash a copy by value — the record is a sub-slice of `data`
+		// so this is cheap and safe.
+		r := rec
+		pending = &r
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ddd: parse card: %w", err)
 	}
+	// Flush trailing unsigned record (no sig followed).
+	if pending != nil {
+		flush(*pending, nil)
+	}
+	c.Signature.ChainValid, c.Signature.EFs = cfg.verifier.Finalise()
+	finaliseSignatureSummary(c)
 	return c, nil
+}
+
+// finaliseSignatureSummary fills in the count fields and the top-level
+// Card.Verified bool from the per-EF list. Card.Verified reads true
+// only when the chain validates *and* at least one EF was actually
+// verified *and* no EF failed — a strict definition that future
+// callers can relax if needed.
+func finaliseSignatureSummary(c *Card) {
+	for _, ef := range c.Signature.EFs {
+		switch ef.Status {
+		case "verified":
+			c.Signature.VerifiedCount++
+		case "failed":
+			c.Signature.FailedCount++
+		default:
+			c.Signature.UnverifiableCount++
+		}
+	}
+	c.Verified = c.Signature.ChainValid &&
+		c.Signature.VerifiedCount > 0 &&
+		c.Signature.FailedCount == 0
 }
 
 // dispatchCardEF routes a single data record to the EF-specific decoder
@@ -427,7 +490,8 @@ func authStatusToCardData(records []card.AuthStatusEntry) []AuthStatusEntry {
 
 // ParseVU is the entry point for vehicle-unit .ddd files. Not implemented
 // in Phase A.
-func ParseVU(data []byte) (*VU, error) {
+func ParseVU(data []byte, opts ...ParseOption) (*VU, error) {
+	_ = resolveOpts(opts) // accepted but ignored until Phase C
 	return nil, fmt.Errorf("ddd: ParseVU not implemented yet (Phase C)")
 }
 

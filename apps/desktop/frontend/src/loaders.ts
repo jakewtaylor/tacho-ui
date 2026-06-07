@@ -7,6 +7,7 @@ import {
   GetDriverVehicles,
   GetEventsAndFaults,
   GetGnssPoints,
+  GetLatestSignatureSummary,
   GetLoadTypeEntries,
   GetLoadUnloadOps,
   GetPlaceRecords,
@@ -39,6 +40,7 @@ export type DriverLoaderData = {
   borderCrossings: db.BorderCrossing[];
   loadUnloadOps: db.LoadUnloadOp[];
   loadTypeEntries: db.LoadTypeEntry[];
+  signatureSummary: db.SignatureSummary | null;
 };
 
 export async function driverLoader({
@@ -59,6 +61,7 @@ export async function driverLoader({
     borderCrossings,
     loadUnloadOps,
     loadTypeEntries,
+    signatureSummary,
   ] = await Promise.all([
     GetDriverProfile(cardNumber),
     GetDailyRecords(cardNumber),
@@ -69,6 +72,7 @@ export async function driverLoader({
     GetBorderCrossings(cardNumber),
     GetLoadUnloadOps(cardNumber),
     GetLoadTypeEntries(cardNumber),
+    GetLatestSignatureSummary(cardNumber),
   ]);
 
   if (!profile) {
@@ -91,5 +95,6 @@ export async function driverLoader({
     borderCrossings: borderCrossings ?? [],
     loadUnloadOps: loadUnloadOps ?? [],
     loadTypeEntries: loadTypeEntries ?? [],
+    signatureSummary: signatureSummary ?? null,
   };
 }

@@ -58,7 +58,7 @@ func ImportCard(ctx context.Context, store *db.DB, filename string, data []byte)
 		}, nil
 	}
 
-	card, err := ddd.ParseCard(data)
+	card, err := ddd.ParseCard(data, buildVerifierOption()...)
 	if err != nil {
 		return nil, fmt.Errorf("decode card: %w", err)
 	}
@@ -84,10 +84,16 @@ func ImportCard(ctx context.Context, store *db.DB, filename string, data []byte)
 		return nil, err
 	}
 
+	sigJSON, err := marshalSignatureSummary(card)
+	if err != nil {
+		return nil, fmt.Errorf("marshal signature summary: %w", err)
+	}
 	res, err := tx.ExecContext(ctx, `
-        INSERT INTO imports (filename, file_type, file_sha256, driver_card_number, imported_at, size_bytes)
-        VALUES (?, 'card', ?, ?, ?, ?)`,
-		filename, hashHex, cardNumber, now, int64(len(data)),
+        INSERT INTO imports
+            (filename, file_type, file_sha256, driver_card_number, imported_at, size_bytes,
+             signature_summary_json)
+        VALUES (?, 'card', ?, ?, ?, ?, ?)`,
+		filename, hashHex, cardNumber, now, int64(len(data)), sigJSON,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert import: %w", err)
@@ -599,6 +605,45 @@ func backfillAuthStatus(ctx context.Context, tx *sql.Tx, cardNumber string, c *d
 		stmt.Close()
 	}
 	return nil
+}
+
+// marshalSignatureSummary serialises the verification result for
+// storage in imports.signature_summary_json. The top-level Verified
+// bool is hoisted into the JSON for easy SQL filtering / quick reads.
+func marshalSignatureSummary(c *ddd.Card) (string, error) {
+	payload := struct {
+		Verified bool `json:"verified"`
+		ddd.SignatureSummary
+	}{
+		Verified:         c.Verified,
+		SignatureSummary: c.Signature,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// buildVerifierOption constructs the verifier chain the importer
+// passes to ddd.ParseCard. We try to set up the embedded-ERCA Gen1
+// and Gen2 verifiers; whichever ones succeed are composed into a
+// single CompositeVerifier. If neither has an ERCA key embedded
+// (the default state on a fresh checkout — see packages/go-ddd/pki/),
+// no verifier is configured and the card parses with every EF
+// reported as "unverifiable / no verifier configured".
+func buildVerifierOption() []ddd.ParseOption {
+	var verifiers []ddd.Verifier
+	if v, err := ddd.NewGen1VerifierFromEmbedded(); err == nil {
+		verifiers = append(verifiers, v)
+	}
+	if v, err := ddd.NewGen2VerifierFromEmbedded(); err == nil {
+		verifiers = append(verifiers, v)
+	}
+	if len(verifiers) == 0 {
+		return nil
+	}
+	return []ddd.ParseOption{ddd.WithVerifier(ddd.NewCompositeVerifier(verifiers...))}
 }
 
 func formatTime(t time.Time) string {

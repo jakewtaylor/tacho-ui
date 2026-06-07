@@ -42,6 +42,26 @@ type ImportInfo struct {
 	SizeBytes  int64  `json:"sizeBytes"`
 }
 
+// SignatureSummary mirrors ddd.SignatureSummary (plus the top-level
+// Verified bool) for one imported card. Read via GetLatestSignatureSummary.
+type SignatureSummary struct {
+	Verified          bool             `json:"verified"`
+	ChainValid        bool             `json:"chainValid"`
+	VerifiedCount     int              `json:"verifiedCount"`
+	FailedCount       int              `json:"failedCount"`
+	UnverifiableCount int              `json:"unverifiableCount"`
+	EFs               []EFSignatureRow `json:"efs"`
+}
+
+// EFSignatureRow is one per-EF result. Matches ddd.EFSignature on the
+// wire, kept here so the frontend doesn't need a separate type binding.
+type EFSignatureRow struct {
+	FID        uint16 `json:"fid"`
+	Generation int    `json:"generation"`
+	Status     string `json:"status"`
+	Reason     string `json:"reason,omitempty"`
+}
+
 // ActivityChange — snake_case retained (matches activity.ts ActivityChange).
 type ActivityChange struct {
 	Driver      bool `json:"driver"`
